@@ -111,6 +111,17 @@ llm_utils = "*"
     // Since the GGUF formatted prompt is just a string, we can just use the generic count_tokens function
     //
     let total_prompt_tokens: u32 = tokenizer.count_tokens(&gguf_formatted_prompt);
+
+    // Validate requested max_tokens for a generation. If it exceeds the models limits, reduce max_tokens to a safe value.
+    //
+    let safe_max_tokens = get_and_check_max_tokens_for_response(
+            model.context_length,
+            model.max_tokens_output, // If using a GGUF model use either model.context_length or the ctx_size of the server.
+            total_prompt_tokens,
+            10,
+            None,
+            requested_max_tokens,
+        )?;
 ```
 
 ### Grammar 🤓

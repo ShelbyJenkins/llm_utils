@@ -8,7 +8,9 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct GGUFModel {
     pub model_id: String,
+    pub model_url: String,
     pub local_model_path: String,
+    pub open_source_model_type: OpenSourceModelType,
     pub metadata: GGUFMetadata,
 }
 
@@ -79,10 +81,11 @@ impl GGUFModelBuilder {
 
     pub async fn load(&mut self) -> Result<GGUFModel> {
         let local_model_filename = if let Some(quant_file_url) = &self.quant_file_url {
-            let (_, repo_id, gguf_model_filename) =
+            let (model_id, repo_id, gguf_model_filename) =
                 HuggingFaceLoader::parse_full_model_url(quant_file_url);
             self.hf_loader =
                 Some(HuggingFaceLoader::new(self.hf_token.clone()).model_from_repo_id(&repo_id));
+            self.open_source_model_type = OpenSourceModelType::from_model_id(&model_id);
             self.hf_loader
                 .as_ref()
                 .unwrap()
@@ -102,10 +105,20 @@ impl GGUFModelBuilder {
             self.try_load(&model_id, quantization_bits).await?
         };
 
-        let local_model_path = HuggingFaceLoader::canonicalize_local_path(local_model_filename)?;
+        let model_url = if let Some(quant_file_url) = &self.quant_file_url {
+            quant_file_url.to_string()
+        } else {
+            HuggingFaceLoader::model_url_from_repo_and_local_filename(
+                &self.open_source_model_type.gguf_repo_id(),
+                &local_model_filename.to_string_lossy(),
+            )
+        };
 
+        let local_model_path = HuggingFaceLoader::canonicalize_local_path(local_model_filename)?;
         Ok(GGUFModel {
             model_id: self.open_source_model_type.model_id(),
+            model_url,
+            open_source_model_type: self.open_source_model_type.clone(),
             metadata: GGUFMetadata::new(&local_model_path)?,
             local_model_path,
         })

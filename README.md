@@ -22,7 +22,7 @@ llm_utils = "*"
     // Or just load directly from a url
     //
     let model: GGUFModel = GGUFModelBuilder::new(hf_token.clone())
-            .from_quant_file_url(quantized_model_url)
+            .from_quant_file_url(model_url)
             .load()
             .await?;
 

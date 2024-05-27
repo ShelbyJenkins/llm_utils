@@ -5,7 +5,7 @@ edition="2021"
 homepage="https://github.com/shelbyJenkins/llm-utils"
 name="llm_utils"
 readme="README.md"
-version="0.0.1"
+version="0.0.2"
 
 categories=["multimedia::encoding", "science"]
 keywords=["anthropic", "ggml", "gguf", "llm", "openai"]

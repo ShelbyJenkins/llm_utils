@@ -2,7 +2,7 @@ pub mod anthropic;
 pub mod gguf;
 pub mod openai;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub enum OpenSourceModelType {
     #[default]
     Mistral7bInstructV0_3,
@@ -69,6 +69,22 @@ impl OpenSourceModelType {
             OpenSourceModelType::Mixtral8x22bInstruct => 176,
             OpenSourceModelType::Llama3_70bInstruct => 70,
             OpenSourceModelType::Llama3_8bInstruct => 8,
+        }
+    }
+
+    pub fn from_model_id(model_id: &str) -> Self {
+        let model_id = if model_id.ends_with("-GGUF") {
+            model_id.trim_end_matches("-GGUF")
+        } else {
+            model_id
+        };
+        match model_id.to_lowercase() {
+            x if x == "mistral-7b-instruct-v0.3" => OpenSourceModelType::Mistral7bInstructV0_3,
+            x if x == "mixtral-8x7b-instruct-v0.1" => OpenSourceModelType::Mixtral8x7bInstruct,
+            x if x == "mixtral-8x22b-instruct-v0.1" => OpenSourceModelType::Mixtral8x22bInstruct,
+            x if x == "meta-llama-3-70b-instruct" => OpenSourceModelType::Llama3_70bInstruct,
+            x if x == "meta-llama-3-8b-instruct" => OpenSourceModelType::Llama3_8bInstruct,
+            _ => panic!("Model ID not found!"),
         }
     }
 }

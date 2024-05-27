@@ -98,6 +98,19 @@ impl HuggingFaceLoader {
             (model_id, repo_id, gguf_model_filename)
         }
     }
+
+    pub fn model_url_from_repo_and_local_filename(
+        repo_id: &str,
+        local_model_filename: &str,
+    ) -> String {
+        let filename = std::path::Path::new(local_model_filename)
+            .file_name()
+            .and_then(|os_str| os_str.to_str())
+            .unwrap_or(local_model_filename);
+
+        format!("https://huggingface.co/{}/blob/main/{}", repo_id, filename)
+    }
+
     pub fn model_id_from_url(model_url: &str) -> String {
         let parts = Self::parse_full_model_url(model_url);
         parts.0

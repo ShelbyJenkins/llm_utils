@@ -2,15 +2,15 @@
 authors=["Shelby Jenkins"]
 description="Utilities for Llama.cpp, Openai, Anthropic, Mistral-rs."
 edition="2021"
-homepage="https://github.com/shelbyJenkins/llm-utils"
+homepage="https://github.com/shelbyJenkins/llm_utils"
 name="llm_utils"
 readme="README.md"
-version="0.0.2"
+version="0.0.3"
 
 categories=["multimedia::encoding", "science"]
 keywords=["anthropic", "ggml", "gguf", "llm", "openai"]
 license="MIT"
-repository="https://github.com/shelbyJenkins/llm-utils"
+repository="https://github.com/shelbyJenkins/llm_utils"
 
 [dependencies]
 anyhow="1.0.86"

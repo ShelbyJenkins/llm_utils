@@ -26,7 +26,3 @@ serde_json="1.0.117"
 tiktoken-rs="0.5.9"
 tokenizers="0.19.1"
 tokio={version="1.37.0"}
-
-[[bin]]
-name="model_loader_cli"
-path="src/bin/model_loader_cli.rs"

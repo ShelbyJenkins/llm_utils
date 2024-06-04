@@ -1,4 +1,6 @@
+use crate::hf_loader::HuggingFaceLoader;
 use anyhow::{anyhow, Result};
+use std::{fmt, path::PathBuf};
 use tiktoken_rs::{get_bpe_from_model, CoreBPE};
 use tokenizers::Tokenizer as HFTokenizer;
 
@@ -7,13 +9,27 @@ pub enum TokenizerBackend {
     Tiktoken(CoreBPE),
 }
 
-pub struct LlmUtilsTokenizer {
+impl fmt::Debug for TokenizerBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenizerBackend::HuggingFacesTokenizer(_) => {
+                write!(f, "TokenizerBackend::HuggingFacesTokenizer")
+            }
+            TokenizerBackend::Tiktoken(_) => {
+                write!(f, "TokenizerBackend::Tiktoken")
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LlmTokenizer {
     pub tokenizer: TokenizerBackend,
     pub with_special_tokens: bool,
     pub white_space_token_id: u32,
 }
 
-impl LlmUtilsTokenizer {
+impl LlmTokenizer {
     pub fn new_tiktoken(model_id: &str) -> Self {
         let tokenizer = get_bpe_from_model(model_id).unwrap();
         let white_space_token_id = tokenizer.encode_ordinary(" ").remove(0) as u32;
@@ -24,13 +40,22 @@ impl LlmUtilsTokenizer {
         }
     }
 
-    pub fn new_from_model(tokenizer: HFTokenizer) -> Self {
+    pub fn new_from_tokenizer_json(tokenizer_json_path: &PathBuf) -> Self {
+        let tokenizer = HFTokenizer::from_file(tokenizer_json_path).unwrap();
         let white_space_token_id = tokenizer.encode(" ", false).unwrap().get_ids()[0];
         Self {
             tokenizer: TokenizerBackend::HuggingFacesTokenizer(tokenizer),
             with_special_tokens: false,
             white_space_token_id,
         }
+    }
+
+    pub async fn new_from_hf_repo(hf_token: &Option<String>, repo_id: &str) -> Result<Self> {
+        let hf_loader = HuggingFaceLoader::new(hf_token.clone()).model_from_repo_id(repo_id);
+        let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json").await?;
+        Ok(LlmTokenizer::new_from_tokenizer_json(
+            &tokenizer_json_path,
+        ))
     }
 
     pub fn tokenize(&self, str: &str) -> Vec<u32> {

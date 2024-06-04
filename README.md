@@ -4,49 +4,50 @@ Utilities for Llama.cpp, Openai, Anthropic, Mistral-rs. Made for the llm_client 
 ```toml
 [dependencies]
 llm_utils = "*"
-```
-### Model loading 🛤️
-- Presets for popular GGUF models, along with pre-populated models for Openai and Anthropic.
 
-- Load GGUF models from Hugging Face with auto-quantization level picking based on vram.
+```
+### Model presets 🛤️
+
+- Presets for Open Source LLMs from Hugging Face, or API models like OpenAI, and Anthropic.
+
+- Load and/or download a model with metadata, tokenizer, and local path (for local LLMs like llama.cpp, vllm, mistral.rs).
+
+- Auto-select the largest quantized GGUF that will fit in your vram!
+
+Supported Open Source models:
+
+⚪ Llama 3
+
+⚪ Mistral and Mixtral
+
+⚪ Phi 3
+
+
+
 ```rust
-    // Download the largest quantized Mistral-7B-Instruct model that will fit in your vram
+    // Load the largest quantized Mistral-7B-Instruct model that will fit in your vram
     //
-    let model: GGUFModel = GGUFModelBuilder::default()
+    let model: OsLlm = PresetModelBuilder::new()
         .mistral_7b_instruct()
         .vram(48)
         .ctx_size(9001) // ctx_size impacts vram usage!
         .load()
         .await?;
 
-    // Or just load directly from a url
-    //
-    let model: GGUFModel = GGUFModelBuilder::new(hf_token.clone())
-            .from_quant_file_url(model_url)
-            .load()
-            .await?;
-
-    not_a_real_assert_eq!(model, GGUFModel {
+    not_a_real_assert_eq!(model, OsLlm {
         pub model_id: String,
+        pub model_url: String,
         pub local_model_path: String, // Use this to load the llama.cpp server
-        pub metadata: GGUFMetadata,
-    })
-
-    not_a_real_assert_eq!(model.metadata, GGUFMetadata {
-        pub embedding_length: u32,    // hidden_size
-        pub head_count: u32,          // num_attention_heads
-        pub feed_forward_length: u32, // intermediate_size
-        pub context_length: u32,      // max_position_embeddings
-        pub chat_template: String,    // tokenizer.chat_template
+        pub model_config_json: OsLlmConfigJson,
+        pub chat_template: OsLlmChatTemplate,
+        pub tokenizer: Option<LlmTokenizer>,
     })
 
     // Or Openai
     //
-    let model: OpenAiModel = OpenAiModel::gpt_4_o();
+    let model: OpenAiLlm = OpenAiLlm::gpt_4_o();
 
-    let model: OpenAiModel = OpenAiModel::openai_backend_from_model_id("gpt-4o");
-
-    not_a_real_assert_eq!(model, OpenAiModel {
+    not_a_real_assert_eq!(model, OpenAiLlm {
         model_id: "gpt-4o".to_string(),
         context_length: 128000,
         cost_per_m_in_tokens: 5.00,
@@ -54,31 +55,80 @@ llm_utils = "*"
         cost_per_m_out_tokens: 15.00,
         tokens_per_message: 3,
         tokens_per_name: 1,
+        tokenizer: Option<LlmTokenizer>,
     })
+
+    // Or Anthropic
+    //
+    let model: AnthropicLlm = AnthropicLlm::gpt_4_o();
+```
+
+### GGUF models from Hugging Face or local path 🚤
+
+```rust
+    // From HF
+    //
+    let model_url = "https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q6_K.gguf";
+    let model: OsLlm = GGUFModelBuilder::new()
+            .hf_quant_file_url(model_url)
+            .load()
+            .await?;
+
+    // Note: because we can't instantiate a tokenizer from a GGUF file, the returned model will not have a tokenizer!
+    // However, if we provide the base model's repo, we load from there.
+    let repo_id = "meta-llama/Meta-Llama-3-8B-Instruct";
+    let model: OsLlm = GGUFModelBuilder::new()
+        .hf_quant_file_url(model_url)
+        .hf_config_repo_id(repo_id)
+        .load()
+        .await?;
+
+    // From Local
+    //
+    let local_path = "/root/.cache/huggingface/hub/models--MaziyarPanahi--Meta-Llama-3-8B-Instruct-GGUF/blobs/c2ca99d853de276fb25a13e369a0db2fd3782eff8d28973404ffa5ffca0b9267";
+    let model: OsLlm = GGUFModelBuilder::new()
+            .local_quant_file_path(local_path)
+            .load()
+            .await?;
+
+    // Again, we require a tokenizer.json. This can also be loaded from a local path.
+    let local_config_path = "/llm_utils/src/models/open_source/llama/llama_3_8b_instruct";
+    let model: OsLlm = GGUFModelBuilder::new()
+        .local_quant_file_path(model_url)
+        .local_config_path(local_config_path)
+        .load()
+        .await?;
 ```
 
 ### Tokenizer 🧮
-- Hugging Face's Tokenizer library for local models and Tiktoken-rs for Openai.
+- Hugging Face's Tokenizer library for local models and Tiktoken-rs for OpenAI and Anthropic ([Anthropic doesn't have a publically available tokenizer](https://github.com/javirandor/anthropic-tokenizer).)
 
 - Simple abstract API for encoding and decoding allows for abstract LLM consumption across multiple architechtures.
 
 - Safely set the `max_token` param for LLMs to ensure requests don't fail due to exceeding token limits!
 ```rust
-    // Get a tokenizer
+    // Get a Tiktoken tokenizer
     //
-    let tokenizer: LlmUtilsTokenizer = LlmUtilsTokenizer::new_tiktoken("gpt-4o");
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_tiktoken("gpt-4o");
 
-    // Or from hugging face... 
-    // need to add support for a tokenizer from GGUF, but this does not exist yet. 
-    // So the tokenizer does not work unless you can first load the tokenizer.json from the original repo
-    // as the GGUF format doesn't not include it.
+    // Get a Hugging Face tokenizer from local path
     //
-    let tokenizer: LlmUtilsTokenizer = LlmUtilsTokenizer::new_from_model(tokenizers::Tokenizer::from_file("path/to/tokenizer.json"));
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_tokenizer_json("path/to/tokenizer.json");
+    
+    // Or load from repo
+    //
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_hf_repo(hf_token, "meta-llama/Meta-Llama-3-8B-Instruct");
 
+    // Get tokenizan'
+    //
     let token_ids: Vec<u32> = tokenizer.tokenize("Hello there");
+    let count: u32 = tokenizer.count_tokens("Hello there");
+    let word_probably: String = tokenizer.detokenize_one(token_ids[0])?; 
+    let words_probably: String = tokenizer.detokenize_many(token_ids)?; 
 
-    // This function is used for generating logit bias
+    // These function are used for generating logit bias
     let token_id: u32 = tokenizer.try_into_single_token("hello");
+    let word_probably: String = tokenizer.try_from_single_token_id(1234);
 ```
 
 ### Prompting 🎶

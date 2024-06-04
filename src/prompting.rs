@@ -1,3 +1,4 @@
+use crate::models::open_source::OsLlmChatTemplate;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment, ErrorKind};
 use std::{collections::HashMap, fs::File, io::Read, path::Path};
@@ -129,10 +130,9 @@ fn create_user_prompt(user_content: &Option<String>) -> HashMap<String, String> 
 /// The prompt converted to a model-specific format as a String.
 pub fn convert_default_prompt_to_model_format(
     default_prompt: &HashMap<String, HashMap<String, String>>,
-    chat_template: &str,
+    chat_template: &OsLlmChatTemplate,
 ) -> Result<String> {
     let mut content_str = String::new();
-
     if let Some(system_content) = default_prompt
         .get("system")
         .and_then(|system| system.get("content"))
@@ -141,7 +141,6 @@ pub fn convert_default_prompt_to_model_format(
             content_str.push_str(&format!("instructions: {}\n", system_content));
         }
     }
-
     if let Some(user_content) = default_prompt
         .get("user")
         .and_then(|user| user.get("content"))
@@ -150,7 +149,6 @@ pub fn convert_default_prompt_to_model_format(
             content_str.push_str(&format!("user input: {}", user_content));
         }
     };
-
     let preformated_prompt = HashMap::from([
         ("role".to_string(), "user".to_string()),
         ("content".to_string(), content_str.to_string()),
@@ -168,23 +166,31 @@ pub fn convert_default_prompt_to_model_format(
 /// # Returns
 ///
 /// The formatted message as a String.
-fn apply_chat_template(message: HashMap<String, String>, chat_template: &str) -> Result<String> {
+fn apply_chat_template(
+    message: HashMap<String, String>,
+    chat_template: &OsLlmChatTemplate,
+) -> Result<String> {
     let messages = vec![message];
     let mut env = Environment::new();
     // https://github.com/huggingface/transformers/blob/76a33a10923ccc1074917f6b6a1e719e626b7dc9/src/transformers/tokenization_utils_base.py#L1842
     env.set_lstrip_blocks(true);
     env.set_trim_blocks(true);
 
-    let template = chat_template.replace(".strip()", "|trim");
-    env.add_template("chat_template", template.as_str())?;
+    let template = &chat_template.chat_template;
+    let bos_token = chat_template.bos_token.as_deref().unwrap_or("");
+    let eos_token = chat_template.eos_token.as_deref().unwrap_or("");
+    let unk_token = chat_template.unk_token.as_deref().unwrap_or("");
+
+    // let template = chat_template.replace(".strip()", "|trim");
+    env.add_template("chat_template", template)?;
     env.add_function("raise_exception", raise_exception);
     let tmpl = env.get_template("chat_template").unwrap();
     Ok(tmpl.render(context! {
         messages => messages,
         add_generation_prompt => false,
-        bos_token => "",
-        eos_token => "",
-        unk_token => "",
+        bos_token => bos_token,
+        eos_token => eos_token,
+        unk_token => unk_token,
     })?)
 }
 
@@ -272,34 +278,34 @@ pub fn get_and_check_max_tokens_for_response(
 mod tests {
     use super::*;
 
-    const SYSTEM_MESSAGE: &str = "I'm listening1234";
-    const USER_MESSAGE: &str = "Hello1234";
+    const SYSTEM_MESSAGE: &str = "I'm listening";
+    const USER_MESSAGE: &str = "Hello!";
 
     #[test]
     fn test_chat_templates() -> Result<()> {
         let templates = [
-            // ChatML: https://huggingface.co/teknium/OpenHermes-2.5-Mistral-7B
-           "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}",
-            // mistralai/Mistral-7B-Instruct-v0.1
-            "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if message['role'] == 'user' %}{{ '[INST] ' + message['content'] + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ message['content'] + eos_token + ' ' }}{% else %}{{ raise_exception('Only user and assistant roles are supported!') }}{% endif %}{% endfor %}",
-            // meta-llama/Llama-2-13b-chat-hf
-           "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' ' + eos_token }}{% endif %}{% endfor %}",
+            // mistralai/Mistral-7B-Instruct-v0.3
+            "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if message['role'] == 'user' %}{{ '[INST] ' + message['content'] + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ message['content'] + eos_token}}{% else %}{{ raise_exception('Only user and assistant roles are supported!') }}{% endif %}{% endfor %}",
+            // meta-llama-3-8b-instruct
+            "{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n'+ message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{% if add_generation_prompt %}{{ '<|start_header_id|>assistant<|end_header_id|>\n\n' }}{% endif %}",
             // mistralai/Mixtral-8x7B-Instruct-v0.1
             "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if message['role'] == 'user' %}{{ '[INST] ' + message['content'] + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ message['content'] + eos_token}}{% else %}{{ raise_exception('Only user and assistant roles are supported!') }}{% endif %}{% endfor %}",
             // google/gemma-7b-it
             "{{ bos_token }}{% if messages[0]['role'] == 'system' %}{{ raise_exception('System role not supported') }}{% endif %}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if (message['role'] == 'assistant') %}{% set role = 'model' %}{% else %}{% set role = message['role'] %}{% endif %}{{ '<start_of_turn>' + role + '\n' + message['content'] | trim + '<end_of_turn>\n' }}{% endfor %}{% if add_generation_prompt %}{{'<start_of_turn>model\n'}}{% endif %}",
-        ];
-        let expected_outputs = [
             // ChatML: https://huggingface.co/teknium/OpenHermes-2.5-Mistral-7B
-            "<|im_start|>user\ninstructions: I'm listening1234\nuser input: Hello1234<|im_end|>\n",
-            // mistralai/Mistral-7B-Instruct-v0.1
-            "[INST] instructions: I'm listening1234\nuser input: Hello1234 [/INST]",
-            // meta-llama/Llama-2-13b-chat-hf
-            "[INST] instructions: I'm listening1234\nuser input: Hello1234 [/INST]",
-            // mistralai/Mixtral-8x7B-Instruct-v0.1
-            "[INST] instructions: I'm listening1234\nuser input: Hello1234 [/INST]",
-            // google/gemma-7b-it
-            "<start_of_turn>user\ninstructions: I'm listening1234\nuser input: Hello1234<end_of_turn>\n",
+           "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}",
+            ];
+        let expected_outputs = [
+                // mistralai/Mistral-7B-Instruct-v0.1
+                "<s>[INST] instructions: I'm listening\nuser input: Hello! [/INST]",
+                // meta-llama-3-8b-instruct
+                "<s><|start_header_id|>user<|end_header_id|>\n\ninstructions: I'm listening\nuser input: Hello!<|eot_id|>",
+                // mistralai/Mixtral-8x7B-Instruct-v0.1
+                "<s>[INST] instructions: I'm listening\nuser input: Hello! [/INST]",
+                // google/gemma-7b-it
+                "<s><start_of_turn>user\ninstructions: I'm listening\nuser input: Hello!<end_of_turn>\n",
+                // ChatML: https://huggingface.co/teknium/OpenHermes-2.5-Mistral-7B
+                "<|im_start|>user\ninstructions: I'm listening\nuser input: Hello!<|im_end|>\n",
         ];
         for (i, template) in templates.iter().enumerate() {
             let prompt = default_formatted_prompt(
@@ -307,7 +313,14 @@ mod tests {
                 &None,
                 &Some(USER_MESSAGE.to_string()),
             )?;
-            let res = convert_default_prompt_to_model_format(&prompt, template)?;
+            let chat_template = OsLlmChatTemplate {
+                chat_template: template.to_string(),
+                bos_token: Some("<s>".to_string()),
+                eos_token: Some("</s>".to_string()),
+                unk_token: Some("<unk>".to_string()),
+            };
+
+            let res = convert_default_prompt_to_model_format(&prompt, &chat_template)?;
             assert_eq!(res, expected_outputs[i]);
         }
         Ok(())

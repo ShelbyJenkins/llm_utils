@@ -1,4 +1,4 @@
-use crate::tokenizer::LlmUtilsTokenizer;
+use crate::tokenizer::LlmTokenizer;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -6,14 +6,14 @@ use std::collections::HashMap;
 ///
 /// # Arguments
 ///
-/// * `tokenizer` - A reference to the `LlmUtilsTokenizer` used for tokenization.
+/// * `tokenizer` - A reference to the `LlmTokenizer` used for tokenization.
 /// * `logit_bias` - A reference to the `HashMap` containing the logit biases with token IDs as keys and bias values as values.
 ///
 /// # Returns
 ///
 /// Returns `Result<(), anyhow::Error>` indicating success or an error if any of the token IDs are invalid.
 pub fn validate_logit_bias_token_ids(
-    tokenizer: &LlmUtilsTokenizer,
+    tokenizer: &LlmTokenizer,
     logit_bias: &HashMap<u32, f32>,
 ) -> Result<()> {
     for token_id in logit_bias.keys() {
@@ -26,14 +26,14 @@ pub fn validate_logit_bias_token_ids(
 ///
 /// # Arguments
 ///
-/// * `tokenizer` - A reference to the `LlmUtilsTokenizer` used for tokenization.
+/// * `tokenizer` - A reference to the `LlmTokenizer` used for tokenization.
 /// * `logit_bias` - A reference to the `HashMap` containing the logit biases with characters as keys and bias values as values.
 ///
 /// # Returns
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_chars(
-    tokenizer: &LlmUtilsTokenizer,
+    tokenizer: &LlmTokenizer,
     logit_bias: &HashMap<char, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();
@@ -50,14 +50,14 @@ pub fn logit_bias_from_chars(
 ///
 /// # Arguments
 ///
-/// * `tokenizer` - A reference to the `LlmUtilsTokenizer` used for tokenization.
+/// * `tokenizer` - A reference to the `LlmTokenizer` used for tokenization.
 /// * `logit_bias` - A reference to the `HashMap` containing the logit biases with words as keys and bias values as values.
 ///
 /// # Returns
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_words(
-    tokenizer: &LlmUtilsTokenizer,
+    tokenizer: &LlmTokenizer,
     logit_bias: &HashMap<String, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();
@@ -99,14 +99,14 @@ pub fn logit_bias_from_words(
 ///
 /// # Arguments
 ///
-/// * `tokenizer` - A reference to the `LlmUtilsTokenizer` used for tokenization.
+/// * `tokenizer` - A reference to the `LlmTokenizer` used for tokenization.
 /// * `logit_bias` - A reference to the `HashMap` containing the logit biases with texts as keys and bias values as values.
 ///
 /// # Returns
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_texts(
-    tokenizer: &LlmUtilsTokenizer,
+    tokenizer: &LlmTokenizer,
     logit_bias: &HashMap<String, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();

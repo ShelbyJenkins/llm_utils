@@ -59,6 +59,36 @@ impl HuggingFaceLoader {
             .map_err(|e| anyhow!(e))
     }
 
+    pub async fn load_model_safe_tensors(&self) -> Result<Vec<String>> {
+        let mut safe_tensor_filenames = vec![];
+        let api = hf_hub::api::tokio::ApiBuilder::new()
+            .with_progress(true)
+            .with_token(self.get_hf_token())
+            .build()
+            .unwrap();
+        let siblings = api
+            .model(self.repo_id.clone().unwrap())
+            .info()
+            .await?
+            .siblings;
+        for sib in siblings {
+            if sib.rfilename.ends_with(".safetensors") {
+                safe_tensor_filenames.push(sib.rfilename);
+            }
+        }
+        let mut safe_tensor_paths = vec![];
+        for safe_tensor_filename in &safe_tensor_filenames {
+            let safe_tensor_path = api
+                .model(self.repo_id.clone().unwrap())
+                .get(safe_tensor_filename)
+                .await?;
+            let safe_tensor_path = Self::canonicalize_local_path(safe_tensor_path)?;
+            println!("Downloaded safe tensor: {}", safe_tensor_path);
+            safe_tensor_paths.push(safe_tensor_path);
+        }
+        Ok(safe_tensor_paths)
+    }
+
     pub async fn load_tokenizer(&self) -> Result<Tokenizer> {
         let api = hf_hub::api::tokio::ApiBuilder::new()
             .with_progress(true)
@@ -109,6 +139,10 @@ impl HuggingFaceLoader {
             .unwrap_or(local_model_filename);
 
         format!("https://huggingface.co/{}/blob/main/{}", repo_id, filename)
+    }
+
+    pub fn model_url_from_repo(repo_id: &str) -> String {
+        format!("https://huggingface.co/{}", repo_id)
     }
 
     pub fn model_id_from_url(model_url: &str) -> String {

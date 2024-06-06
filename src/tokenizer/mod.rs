@@ -25,6 +25,7 @@ impl fmt::Debug for TokenizerBackend {
 #[derive(Debug)]
 pub struct LlmTokenizer {
     pub tokenizer: TokenizerBackend,
+    pub tokenizer_path: Option<PathBuf>,
     pub with_special_tokens: bool,
     pub white_space_token_id: u32,
 }
@@ -35,6 +36,7 @@ impl LlmTokenizer {
         let white_space_token_id = tokenizer.encode_ordinary(" ").remove(0) as u32;
         Self {
             tokenizer: TokenizerBackend::Tiktoken(tokenizer),
+            tokenizer_path: None,
             with_special_tokens: false,
             white_space_token_id,
         }
@@ -45,17 +47,16 @@ impl LlmTokenizer {
         let white_space_token_id = tokenizer.encode(" ", false).unwrap().get_ids()[0];
         Self {
             tokenizer: TokenizerBackend::HuggingFacesTokenizer(tokenizer),
+            tokenizer_path: Some(tokenizer_json_path.clone()),
             with_special_tokens: false,
             white_space_token_id,
         }
     }
 
-    pub async fn new_from_hf_repo(hf_token: &Option<String>, repo_id: &str) -> Result<Self> {
+    pub fn new_from_hf_repo(hf_token: &Option<String>, repo_id: &str) -> Result<Self> {
         let hf_loader = HuggingFaceLoader::new(hf_token.clone()).model_from_repo_id(repo_id);
-        let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json").await?;
-        Ok(LlmTokenizer::new_from_tokenizer_json(
-            &tokenizer_json_path,
-        ))
+        let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json")?;
+        Ok(LlmTokenizer::new_from_tokenizer_json(&tokenizer_json_path))
     }
 
     pub fn tokenize(&self, str: &str) -> Vec<u32> {

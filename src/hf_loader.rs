@@ -47,30 +47,25 @@ impl HuggingFaceLoader {
             }
         }
     }
-    pub async fn load_file(&self, file_name: &str) -> Result<PathBuf> {
-        let api = hf_hub::api::tokio::ApiBuilder::new()
+    pub fn load_file(&self, file_name: &str) -> Result<PathBuf> {
+        let api = hf_hub::api::sync::ApiBuilder::new()
             .with_progress(true)
             .with_token(self.get_hf_token())
             .build()
             .unwrap();
         api.model(self.repo_id.clone().unwrap())
             .get(file_name)
-            .await
             .map_err(|e| anyhow!(e))
     }
 
-    pub async fn load_model_safe_tensors(&self) -> Result<Vec<String>> {
+    pub fn load_model_safe_tensors(&self) -> Result<Vec<String>> {
         let mut safe_tensor_filenames = vec![];
-        let api = hf_hub::api::tokio::ApiBuilder::new()
+        let api = hf_hub::api::sync::ApiBuilder::new()
             .with_progress(true)
             .with_token(self.get_hf_token())
             .build()
-            .unwrap();
-        let siblings = api
-            .model(self.repo_id.clone().unwrap())
-            .info()
-            .await?
-            .siblings;
+            .map_err(|e| anyhow!(e))?;
+        let siblings = api.model(self.repo_id.clone().unwrap()).info()?.siblings;
         for sib in siblings {
             if sib.rfilename.ends_with(".safetensors") {
                 safe_tensor_filenames.push(sib.rfilename);
@@ -81,7 +76,7 @@ impl HuggingFaceLoader {
             let safe_tensor_path = api
                 .model(self.repo_id.clone().unwrap())
                 .get(safe_tensor_filename)
-                .await?;
+                .map_err(|e| anyhow!(e))?;
             let safe_tensor_path = Self::canonicalize_local_path(safe_tensor_path)?;
             println!("Downloaded safe tensor: {}", safe_tensor_path);
             safe_tensor_paths.push(safe_tensor_path);
@@ -89,8 +84,8 @@ impl HuggingFaceLoader {
         Ok(safe_tensor_paths)
     }
 
-    pub async fn load_tokenizer(&self) -> Result<Tokenizer> {
-        let api = hf_hub::api::tokio::ApiBuilder::new()
+    pub fn load_tokenizer(&self) -> Result<Tokenizer> {
+        let api = hf_hub::api::sync::ApiBuilder::new()
             .with_progress(true)
             .with_token(self.get_hf_token())
             .build()
@@ -98,7 +93,6 @@ impl HuggingFaceLoader {
         let tokenizer_filename = api
             .model(self.repo_id.clone().unwrap())
             .get("tokenizer.json")
-            .await
             .map_err(|e| anyhow!(e))?;
 
         Tokenizer::from_file(tokenizer_filename).map_err(|e| anyhow!(e))

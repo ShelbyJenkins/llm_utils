@@ -74,7 +74,7 @@ impl PresetModelBuilder {
         self
     }
 
-    pub async fn load(&mut self) -> Result<OsLlm> {
+    pub fn load(&mut self) -> Result<OsLlm> {
         let model_config_json = self.open_source_model_type.model_config_json()?;
 
         // Presumes a batch_size of 512
@@ -86,8 +86,7 @@ impl PresetModelBuilder {
 
         let local_model_filename = HuggingFaceLoader::new(self.hf_token.clone())
             .model_from_repo_id(&self.open_source_model_type.gguf_repo_id())
-            .load_file(&self.open_source_model_type.f_name_for_q_bits(q_bits))
-            .await?;
+            .load_file(&self.open_source_model_type.f_name_for_q_bits(q_bits))?;
 
         let model_url = HuggingFaceLoader::model_url_from_repo_and_local_filename(
             &self.open_source_model_type.gguf_repo_id(),
@@ -277,53 +276,47 @@ pub fn quantization_from_vram(base_model_bytes: f64, vram_gb: u32, context_overh
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn load() -> Result<()> {
+    #[test]
+    fn load() -> Result<()> {
         let model = PresetModelBuilder::default()
             .llama_3_8b_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 
         let model = PresetModelBuilder::default()
             .llama_3_70b_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 
         let model = PresetModelBuilder::default()
             .mistral_7b_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 
         let model = PresetModelBuilder::default()
             .mixtral_8x7b_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 
         let model = PresetModelBuilder::default()
             .phi_3_medium_4k_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 
         let model = PresetModelBuilder::default()
             .phi_3_mini_4k_instruct()
             .quantization_from_vram(48)
-            .load()
-            .await?;
+            .load()?;
 
         println!("{:#?}", model);
 

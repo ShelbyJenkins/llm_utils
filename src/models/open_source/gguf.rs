@@ -59,8 +59,8 @@ impl GGUFModelBuilder {
         self
     }
 
-    pub async fn load(&mut self) -> Result<OsLlm> {
-        let local_model_path = self.load_model().await?;
+    pub fn load(&mut self) -> Result<OsLlm> {
+        let local_model_path = self.load_model()?;
 
         let (model_url, model_id) = if let Some(hf_quant_file_url) = &self.hf_quant_file_url {
             (
@@ -77,14 +77,14 @@ impl GGUFModelBuilder {
         Ok(OsLlm {
             model_id,
             model_url,
-            model_config_json: self.load_config(metadata).await?,
-            chat_template: self.load_chat_template(metadata).await?,
+            model_config_json: self.load_config(metadata)?,
+            chat_template: self.load_chat_template(metadata)?,
             local_model_paths: vec![local_model_path],
-            tokenizer: self.load_tokenizer().await?,
+            tokenizer: self.load_tokenizer()?,
         })
     }
 
-    async fn load_model(&self) -> Result<String> {
+    fn load_model(&self) -> Result<String> {
         if let Some(hf_quant_file_url) = &self.hf_quant_file_url {
             let (_, repo_id, gguf_model_filename) =
                 HuggingFaceLoader::parse_full_model_url(hf_quant_file_url);
@@ -94,8 +94,7 @@ impl GGUFModelBuilder {
             let local_model_filename = hf_loader
                 .as_ref()
                 .unwrap()
-                .load_file(&gguf_model_filename)
-                .await?;
+                .load_file(&gguf_model_filename)?;
             HuggingFaceLoader::canonicalize_local_path(local_model_filename)
         } else if let Some(local_quant_file_path) = &self.quant_file_path {
             Ok(local_quant_file_path.to_owned())
@@ -104,11 +103,12 @@ impl GGUFModelBuilder {
         }
     }
 
-    async fn load_tokenizer(&self) -> Result<Option<LlmTokenizer>> {
+    fn load_tokenizer(&self) -> Result<Option<LlmTokenizer>> {
         if let Some(hf_config_repo_id) = &self.hf_config_repo_id {
-            Ok(Some(
-                LlmTokenizer::new_from_hf_repo(&self.hf_token, hf_config_repo_id).await?,
-            ))
+            Ok(Some(LlmTokenizer::new_from_hf_repo(
+                &self.hf_token,
+                hf_config_repo_id,
+            )?))
         } else if let Some(local_config_path) = &self.local_config_path {
             Ok(Some(LlmTokenizer::new_from_tokenizer_json(
                 &PathBuf::from(local_config_path).join("tokenizer.json"),
@@ -118,14 +118,14 @@ impl GGUFModelBuilder {
         }
     }
 
-    async fn load_config(
+    fn load_config(
         &self,
         metadata: &std::collections::BTreeMap<String, serde_json::Value>,
     ) -> Result<OsLlmConfigJson> {
         if let Some(hf_config_repo_id) = &self.hf_config_repo_id {
             let hf_loader =
                 HuggingFaceLoader::new(self.hf_token.clone()).model_from_repo_id(hf_config_repo_id);
-            let config_json_path = hf_loader.load_file("config.json").await?;
+            let config_json_path = hf_loader.load_file("config.json")?;
             model_config_json_from_local(&config_json_path)
         } else if let Some(local_config_path) = &self.local_config_path {
             model_config_json_from_local(&PathBuf::from(local_config_path).join("config.json"))
@@ -134,14 +134,14 @@ impl GGUFModelBuilder {
         }
     }
 
-    async fn load_chat_template(
+    fn load_chat_template(
         &self,
         metadata: &std::collections::BTreeMap<String, serde_json::Value>,
     ) -> Result<OsLlmChatTemplate> {
         let chat_template = if let Some(hf_config_repo_id) = &self.hf_config_repo_id {
             let hf_loader =
                 HuggingFaceLoader::new(self.hf_token.clone()).model_from_repo_id(hf_config_repo_id);
-            let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer_config.json").await?;
+            let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer_config.json")?;
             chat_template_from_local(&tokenizer_json_path)
         } else if let Some(local_config_path) = &self.local_config_path {
             chat_template_from_local(
@@ -160,6 +160,7 @@ impl GGUFModelBuilder {
                     .as_str()
                     .ok_or_else(|| anyhow!("tokenizer.chat_template is not a valid string"))?
                     .to_string(),
+                chat_template_path: None,
                 bos_token: None,
                 eos_token: None,
                 unk_token: None,
@@ -269,43 +270,43 @@ fn model_config_json_from_gguf(
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn load_hf_basic() -> Result<()> {
+    #[test]
+    fn load_hf_basic() -> Result<()> {
         let model = GGUFModelBuilder::new().hf_quant_file_url("https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q6_K.gguf")
             .load()
-            .await?;
+            ?;
 
         println!("{:#?}", model);
         Ok(())
     }
 
-    #[tokio::test]
-    async fn load_hf_with_config() -> Result<()> {
+    #[test]
+    fn load_hf_with_config() -> Result<()> {
         let model = GGUFModelBuilder::new().hf_quant_file_url("https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q6_K.gguf")
         .hf_config_repo_id("meta-llama/Meta-Llama-3-8B-Instruct")
             .load()
-            .await?;
+            ?;
 
         println!("{:#?}", model);
         assert!(model.tokenizer.is_some());
         Ok(())
     }
 
-    #[tokio::test]
-    async fn load_local_basic() -> Result<()> {
+    #[test]
+    fn load_local_basic() -> Result<()> {
         let model = GGUFModelBuilder::new().local_quant_file_path("/root/.cache/huggingface/hub/models--MaziyarPanahi--Meta-Llama-3-8B-Instruct-GGUF/blobs/c2ca99d853de276fb25a13e369a0db2fd3782eff8d28973404ffa5ffca0b9267")
             .load()
-            .await?;
+            ?;
 
         println!("{:#?}", model);
         Ok(())
     }
 
-    #[tokio::test]
-    async fn load_local_with_config() -> Result<()> {
-        let model = GGUFModelBuilder::new().local_quant_file_path("/root/.cache/huggingface/hub/models--MaziyarPanahi--Meta-Llama-3-8B-Instruct-GGUF/blobs/c2ca99d853de276fb25a13e369a0db2fd3782eff8d28973404ffa5ffca0b9267").local_config_path("/workspaces/test/llm_utils/src/models/open_source/llama/llama_3_8b_instruct")
+    #[test]
+    fn load_local_with_config() -> Result<()> {
+        let model = GGUFModelBuilder::new().local_quant_file_path("/root/.cache/huggingface/hub/models--MaziyarPanahi--Meta-Llama-3-8B-Instruct-GGUF/blobs/c2ca99d853de276fb25a13e369a0db2fd3782eff8d28973404ffa5ffca0b9267").local_config_path("/workspaces/test/llm_utils/src/models/open_source/preset/llama/llama_3_8b_instruct")
             .load()
-            .await?;
+            ?;
         assert!(model.tokenizer.is_some());
         println!("{:#?}", model);
         Ok(())

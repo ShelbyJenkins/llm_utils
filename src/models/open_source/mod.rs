@@ -40,6 +40,7 @@ impl fmt::Debug for OsLlm {
 #[derive(Deserialize, Debug)]
 pub struct OsLlmChatTemplate {
     pub chat_template: String,
+    pub chat_template_path: Option<String>,
     pub bos_token: Option<String>,
     pub eos_token: Option<String>,
     pub unk_token: Option<String>,

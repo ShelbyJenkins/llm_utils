@@ -28,17 +28,17 @@ impl SafeTensorsModelBuilder {
         self
     }
 
-    pub async fn load(&mut self) -> Result<OsLlm> {
+    pub fn load(&mut self) -> Result<OsLlm> {
         let hf_loader =
             HuggingFaceLoader::new(self.hf_token.clone()).model_from_repo_id(&self.repo_id);
-        let config_json_path = hf_loader.load_file("config.json").await?;
+        let config_json_path = hf_loader.load_file("config.json")?;
         let model_config_json = model_config_json_from_local(&config_json_path)?;
 
-        let tokenizer_config_json_path = hf_loader.load_file("tokenizer_config.json").await?;
+        let tokenizer_config_json_path = hf_loader.load_file("tokenizer_config.json")?;
         let chat_template = chat_template_from_local(&tokenizer_config_json_path)?;
 
         let tokenizer = if self.with_tokenizer {
-            let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json").await?;
+            let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json")?;
             Some(LlmTokenizer::new_from_tokenizer_json(&tokenizer_json_path))
         } else {
             None
@@ -49,7 +49,7 @@ impl SafeTensorsModelBuilder {
             model_url: HuggingFaceLoader::model_url_from_repo(&self.repo_id),
             model_config_json,
             chat_template,
-            local_model_paths: hf_loader.load_model_safe_tensors().await?,
+            local_model_paths: hf_loader.load_model_safe_tensors()?,
             tokenizer,
         })
     }
@@ -65,7 +65,9 @@ pub fn model_config_json_from_local(config_json_path: &PathBuf) -> Result<OsLlmC
 pub fn chat_template_from_local(tokenizer_config_json_path: &PathBuf) -> Result<OsLlmChatTemplate> {
     let file = File::open(tokenizer_config_json_path)?;
     let reader = BufReader::new(file);
-    let tokenizer_config: OsLlmChatTemplate = serde_json::from_reader(reader)?;
+    let mut tokenizer_config: OsLlmChatTemplate = serde_json::from_reader(reader)?;
+    tokenizer_config.chat_template_path =
+        Some(tokenizer_config_json_path.to_string_lossy().to_string());
     Ok(tokenizer_config)
 }
 

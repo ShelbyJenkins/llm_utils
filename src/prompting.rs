@@ -118,6 +118,39 @@ fn create_user_prompt(user_content: &Option<String>) -> HashMap<String, String> 
     ])
 }
 
+/// Converts the default prompt to a String. Used when an LLMBackend applies the chat template.
+///
+/// # Arguments
+///
+/// * `default_prompt` - The default prompt as a HashMap.
+///
+/// # Returns
+///
+/// The prompt converted to a String.
+pub fn convert_default_prompt_to_string(
+    default_prompt: &HashMap<String, HashMap<String, String>>,
+) -> String {
+    let mut content_str = String::new();
+    if let Some(system_content) = default_prompt
+        .get("system")
+        .and_then(|system| system.get("content"))
+    {
+        if !system_content.is_empty() {
+            content_str.push_str(&format!("instructions: {}\n", system_content));
+        }
+    }
+    if let Some(user_content) = default_prompt
+        .get("user")
+        .and_then(|user| user.get("content"))
+    {
+        if !user_content.is_empty() {
+            content_str.push_str(&format!("user input: {}", user_content));
+        }
+    };
+
+    content_str
+}
+
 /// Converts the default prompt to a model-specific format, given a default prompt and a chat template.
 ///
 /// # Arguments
@@ -315,6 +348,7 @@ mod tests {
             )?;
             let chat_template = OsLlmChatTemplate {
                 chat_template: template.to_string(),
+                chat_template_path: None,
                 bos_token: Some("<s>".to_string()),
                 eos_token: Some("</s>".to_string()),
                 unk_token: Some("<unk>".to_string()),

@@ -60,7 +60,7 @@ Supported Open Source models:
 
     // Or Anthropic
     //
-    let model: AnthropicLlm = AnthropicLlm::gpt_4_o();
+    let model: AnthropicLlm = AnthropicLlm::claude_3_opus();
 ```
 
 ### GGUF models from Hugging Face or local path 🚤
@@ -142,7 +142,7 @@ Supported Open Source models:
     //
     let default_formatted_prompt: HashMap<String, HashMap<String, String>> = prompting::default_formatted_prompt(
         "You are a nice robot.",
-        "path/to/a/file.yaml",
+        "path/to/a/file/no_birds_and_bees_yap.yaml",
         "Where do robots come from?"
     )?;
 

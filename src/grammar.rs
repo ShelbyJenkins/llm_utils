@@ -141,7 +141,7 @@ pub fn create_list_grammar(min_items: u16, max_items: u16) -> String {
                             },
                             RepetitionType::One,
                         ),
-                        build_removed_character_set(),
+                        build_removed_newline_char_set(),
                         ProductionItem::Terminal(
                             TerminalSymbol {
                                 value: "\\n".to_string(),
@@ -160,7 +160,52 @@ pub fn create_list_grammar(min_items: u16, max_items: u16) -> String {
     )
 }
 
-fn build_removed_character_set() -> ProductionItem {
+/// Sentence Splitter
+///
+pub fn create_sentence_splitter_grammar(split_by: &str) -> String {
+    Grammar {
+        items: vec![
+            GrammarItem::Rule(Rule {
+                lhs: NonTerminalSymbol {
+                    name: "root".to_string(),
+                },
+                rhs: Production {
+                    items: vec![ProductionItem::NonTerminal(
+                        NonTerminalSymbol {
+                            name: "item".to_string(),
+                        },
+                        RepetitionType::OneOrMore,
+                    )],
+                },
+            }),
+            GrammarItem::Rule(Rule {
+                lhs: NonTerminalSymbol {
+                    name: "item".to_string(),
+                },
+                rhs: Production {
+                    items: vec![
+                        ProductionItem::Terminal(
+                            TerminalSymbol {
+                                value: format!("- {}:", split_by),
+                            },
+                            RepetitionType::One,
+                        ),
+                        build_removed_newline_char_set(),
+                        ProductionItem::Terminal(
+                            TerminalSymbol {
+                                value: "\\n".to_string(),
+                            },
+                            RepetitionType::One,
+                        ),
+                    ],
+                },
+            }),
+        ],
+    }
+    .to_string()
+}
+
+fn build_removed_newline_char_set() -> ProductionItem {
     ProductionItem::CharacterSet(
         CharacterSet {
             is_complement: true,
@@ -204,18 +249,26 @@ fn build_removed_character_set() -> ProductionItem {
 // }
 
 fn build_patched_list_frequency(min_items: u16, max_items: u16) -> String {
-    let mut item_rule = String::from("");
-    let optional_count = std::cmp::max(max_items, min_items) - min_items;
+    // let mut item_rule = String::from("");
+    // let optional_count = std::cmp::max(max_items, min_items) - min_items;
 
-    for _ in 0..min_items {
-        item_rule.push_str("item ");
-    }
-    for _ in 0..optional_count {
-        item_rule.push_str("(item");
-    }
-    for _ in 0..optional_count {
-        item_rule.push_str(")?");
-    }
+    // for _ in 0..min_items {
+    //     item_rule.push_str("item ");
+    // }
+    // for _ in 0..optional_count {
+    //     item_rule.push_str("(item");
+    // }
+    // for _ in 0..optional_count {
+    //     item_rule.push_str(")?");
+    // }
 
-    item_rule
+    // item_rule
+
+    if min_items == max_items {
+        format!("item{{{}}}", min_items)
+    } else if min_items == 0 {
+        format!("item{{0,{}}}", max_items)
+    } else {
+        format!("item{{{min_items},{max_items}}}")
+    }
 }

@@ -108,7 +108,7 @@ impl LlmTokenizer {
         }
     }
 
-    /// Creates a window of text normalized to the specified token size.
+    /// Creates a window of text normalized to the specified token size in the center of the text.
     ///
     /// # Arguments
     ///
@@ -130,6 +130,45 @@ impl LlmTokenizer {
 
         let preserved_tokens = &tokens[start_token_index..end_token_index];
         self.detokenize_many(preserved_tokens).unwrap()
+    }
+
+    /// Creates a range of text from the specified start and end token indices.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to create a window from.
+    /// * `target_token_size` - The desired number of tokens in the window.
+    ///
+    /// # Returns
+    ///
+    /// A new string that represents the normalized window of text, or the original
+    /// text if its token count is less than or equal to `target_token_size`.
+    pub fn create_text_range(
+        &self,
+        text: &str,
+        start_token_index: u32,
+        end_token_index: u32,
+    ) -> String {
+        let tokens = self.tokenize(text);
+        let end_token_index = if tokens.len() <= end_token_index as usize {
+            tokens.len()
+        } else {
+            end_token_index as usize
+        };
+
+        let preserved_tokens = &tokens[start_token_index as usize..end_token_index];
+        self.detokenize_many(preserved_tokens).unwrap()
+    }
+
+    pub fn chunk_text(
+        &self,
+        text: &str,
+        max_length: usize,
+        overlap_percent: Option<usize>,
+    ) -> Vec<String> {
+        let mut splitter =
+            crate::text_utils::chunk::DFSTextSplitter::new(max_length, overlap_percent, self);
+        splitter.run(text).unwrap()
     }
 
     fn encode_tiktoken(&self, tokenizer: &CoreBPE, str: &str) -> Vec<u32> {

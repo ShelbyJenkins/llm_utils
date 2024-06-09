@@ -1,26 +1,32 @@
 [package]
 authors=["Shelby Jenkins"]
-description="Utilities for Llama.cpp, Openai, Anthropic, Mistral-rs."
+description="A Swiss army knife for LLMs with features for Llama.cpp, Openai, Anthropic, Mistral-rs."
 edition="2021"
 homepage="https://github.com/shelbyJenkins/llm_utils"
 name="llm_utils"
 readme="README.md"
-version="0.0.5"
+version="0.0.6"
 
 categories=["multimedia::encoding", "science"]
-keywords=["anthropic", "ggml", "gguf", "llm", "openai"]
+keywords=["anthropic", "gguf", "llm", "nlp", "openai"]
 license="MIT"
 repository="https://github.com/shelbyJenkins/llm_utils"
 
 [dependencies]
 anyhow="1.0.86"
+article_scraper="2.1.0"
 dotenv="0.15.0"
+fancy-regex="0.13.0"
 gbnf="0.1.7"
 gguf-rs="0.1.3"
 hf-hub={version="0.3.2"}
+html2text="0.12.5"
+lazy_static="1.4.0"
 minijinja="2.0.1"
 regex="1.10.4"
 serde={version="1.0.202"}
 serde_json="1.0.117"
 tiktoken-rs="0.5.9"
 tokenizers="0.19.1"
+toml="0.8.14"
+unicode-segmentation="1.11.0"

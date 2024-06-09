@@ -1,11 +1,85 @@
 # llm_utils 
-Utilities for Llama.cpp, Openai, Anthropic, Mistral-rs. Made for the llm_client crate, but split into it's own crate because some of these are useful!
+A Swiss army knife for working with LLMs. Features supporting Llama.cpp, Openai, Anthropic, Mistral-rs. Originally made for the llm_client crate, but split into it's own crate just for you.
+
+* Estimate GGUF Vram usage.
+* Clean and chunk HTML and text.
+* Build grammars for Llama.cpp.
+* Ensure your prompts are within LLM token limits.
+
 ### Installation
 ```toml
 [dependencies]
 llm_utils = "*"
 
 ```
+### Tokenizer 🧮
+- Hugging Face's Tokenizer library for local models and Tiktoken-rs for OpenAI and Anthropic ([Anthropic doesn't have a publically available tokenizer](https://github.com/javirandor/anthropic-tokenizer).)
+
+- Simple abstract API for encoding and decoding allows for abstract LLM consumption across multiple architechtures.
+
+- Safely set the `max_token` param for LLMs to ensure requests don't fail due to exceeding token limits!
+```rust
+    // Get a Tiktoken tokenizer
+    //
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_tiktoken("gpt-4o");
+
+    // Get a Hugging Face tokenizer from local path
+    //
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_tokenizer_json("path/to/tokenizer.json");
+    
+    // Or load from repo
+    //
+    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_hf_repo(hf_token, "meta-llama/Meta-Llama-3-8B-Instruct");
+
+    // Get tokenizan'
+    //
+    let token_ids: Vec<u32> = tokenizer.tokenize("Hello there");
+    let count: u32 = tokenizer.count_tokens("Hello there");
+    let word_probably: String = tokenizer.detokenize_one(token_ids[0])?; 
+    let words_probably: String = tokenizer.detokenize_many(token_ids)?; 
+
+    // These function are used for generating logit bias
+    let token_id: u32 = tokenizer.try_into_single_token("hello");
+    let word_probably: String = tokenizer.try_from_single_token_id(1234);
+```
+
+### Text utils 📝
+
+```rust
+    // Normalize whitespace chars to " " and "\n".
+    // Reduce the number of newlines to singles or doubles (paragraphs) or convert them to " ".
+    // Optionally, remove all characters besides alphabetic, numbers, and punctuation. 
+    //
+    let mut text_cleaner: String = llm_utils::text_utils::clean_text::TextCleaner::new();
+    let cleaned_text: String = text_cleaner
+        .reduce_newlines_to_single_space()
+        .remove_non_basic_ascii()
+        .run(some_dirty_text);
+
+    // Convert HTML to cleaned text.
+    // Uses an implementation of Mozilla's readability mode and HTML2Text.
+    //
+    let cleaned_text: String = llm_utils::text_utils::clean_html::clean_html(raw_html);
+
+    // Rule based text segmentation for sentences. 
+    // Better than unicode-segmentation crate or any other crate I tested.
+    // But still not as good as a model based approach like Spacy or other NLP libraries.
+    //
+    let sentence_splits: Vec<String> = 
+        llm_utils::text_utils::split::split_text_into_sentences_regex(some_dirty_text);
+
+    // Split text into balanced chunks as close to the given size as possible.
+    // Unlike other implementations this method attempts to keep the chunks the same size.
+    // This means you won't end up with an orphan final chunk that is too small to be useful.
+    // Implemented with a DFS algo, recursion, memoziation, and heuristic pre-filters.
+    // Attempts to split semantically in the following order:
+    // Paragraphs, newlines, sentences, words, and finally graphmemes.
+    // Please note: this is much slower than other methods. It needs optimizations!
+    //
+    let chunked_text: Vec<String> = 
+        llm_utils::text_utils::chunk::chunk_text(text, chunk_size, Some(overlap_percent));
+```
+
 ### Model presets 🛤️
 
 - Presets for Open Source LLMs from Hugging Face, or API models like OpenAI, and Anthropic.
@@ -21,7 +95,6 @@ Supported Open Source models:
 ⚪ Mistral and Mixtral
 
 ⚪ Phi 3
-
 
 
 ```rust
@@ -100,36 +173,7 @@ Supported Open Source models:
         .await?;
 ```
 
-### Tokenizer 🧮
-- Hugging Face's Tokenizer library for local models and Tiktoken-rs for OpenAI and Anthropic ([Anthropic doesn't have a publically available tokenizer](https://github.com/javirandor/anthropic-tokenizer).)
 
-- Simple abstract API for encoding and decoding allows for abstract LLM consumption across multiple architechtures.
-
-- Safely set the `max_token` param for LLMs to ensure requests don't fail due to exceeding token limits!
-```rust
-    // Get a Tiktoken tokenizer
-    //
-    let tokenizer: LlmTokenizer = LlmTokenizer::new_tiktoken("gpt-4o");
-
-    // Get a Hugging Face tokenizer from local path
-    //
-    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_tokenizer_json("path/to/tokenizer.json");
-    
-    // Or load from repo
-    //
-    let tokenizer: LlmTokenizer = LlmTokenizer::new_from_hf_repo(hf_token, "meta-llama/Meta-Llama-3-8B-Instruct");
-
-    // Get tokenizan'
-    //
-    let token_ids: Vec<u32> = tokenizer.tokenize("Hello there");
-    let count: u32 = tokenizer.count_tokens("Hello there");
-    let word_probably: String = tokenizer.detokenize_one(token_ids[0])?; 
-    let words_probably: String = tokenizer.detokenize_many(token_ids)?; 
-
-    // These function are used for generating logit bias
-    let token_id: u32 = tokenizer.try_into_single_token("hello");
-    let word_probably: String = tokenizer.try_from_single_token_id(1234);
-```
 
 ### Prompting 🎶
 - Generate properly formatted prompts for GGUF models, Openai, and Anthropic.
@@ -234,10 +278,6 @@ Supported Open Source models:
     let llama_logit_bias = logit_bias::convert_logit_bias_to_llama_format(&validated_logit_bias)?;
 ```
 
-### Text utils 📝
-- Generic utils for cleaning text. Mostly useful for RAG.
-
-- Will add text splitting in the future.
 
 
 ### License

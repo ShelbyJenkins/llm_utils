@@ -32,5 +32,8 @@ toml="0.8.14"
 unicode-properties="0.1.1"
 unicode-segmentation="1.11.0"
 
+[patch.crates-io]
+bitstream-io="2.4.2"
+
 [dev-dependencies]
 text-splitter={version="0.14.0", features=["tiktoken-rs"]}

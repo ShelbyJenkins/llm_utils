@@ -1,62 +1,203 @@
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-macro_rules! generate_structs {
+macro_rules! generate_splitting_structs {
     ($($file:ident),+) => {
+        pub struct Splitting {
+            $(
+                pub $file: $file,
+            )+
+        }
         $(
             #[allow(non_camel_case_types)]
             pub struct $file {
-                pub test_content: String,
-                pub sentence_splits: Vec<String>,
+                pub content: String,
+                pub cases: Vec<String>,
+
             }
             impl $file {
-                pub fn load() -> Self {
-                    let file_name = format!("{}.toml", stringify!($file).to_lowercase());
+                fn load_splitting_texts() -> Self {
+                    let file_name = format!("{}.json", stringify!($file).to_lowercase());
                     let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
-                    let file_path=  PathBuf::from(cargo_manifest_dir)
+                    let file_path = PathBuf::from(cargo_manifest_dir)
                         .join("src")
                         .join("text_utils")
                         .join("test_text")
-                        .join("files")
+                        .join("splitting")
                         .join(file_name);
-
                     let content = fs::read_to_string(&file_path).expect("Failed to read file");
-                    let data: toml::Value = toml::from_str(&content).expect("Failed to parse TOML");
+                    let data: serde_json::Value =
+                        serde_json::from_str(&content).expect("Failed to parse JSON");
+
 
                     Self {
-                        test_content: data["test_content"].as_str().unwrap().to_string(),
-                        sentence_splits: data.get("sentence_splits")
-                            .and_then(|value| value.as_array())
-                            .map(|array| {
-                                array.iter()
-                                    .map(|s| s.as_str().unwrap().to_string())
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
+                        content: data["content"].as_str().unwrap().to_string(),
+                        cases: data["cases"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|s| s.as_str().unwrap().to_string())
+                            .collect(),
                     }
                 }
             }
         )+
+        impl Splitting {
+            fn load_splitting_texts() -> Self {
+                Self {
+                    $(
+                        $file: $file::load_splitting_texts(),
+                    )+
+                }
+            }
+        }
     };
 }
 
-generate_structs!(Bnf);
-generate_structs!(Doom);
-generate_structs!(Long);
-generate_structs!(Romeo_Juliet);
-generate_structs!(Macomber);
+generate_splitting_structs!(
+    graphemes_unicode,
+    sentences_rule_1,
+    sentences_rule_2,
+    sentences_rule_3,
+    sentences_rule_4,
+    sentences_unicode,
+    single_eol,
+    two_plus_eol,
+    words_unicode,
+    joining
+);
 
-generate_structs!(Turing);
-generate_structs!(Shake);
-generate_structs!(Katana);
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ChunkingTestCase {
+    pub first: Option<String>,
+    pub last: Option<String>,
+}
+
+impl ChunkingTestCase {
+    pub fn first(&self) -> &str {
+        self.first.as_ref().unwrap()
+    }
+    pub fn last(&self) -> &str {
+        self.last.as_ref().unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ChunkingTestCases {
+    pub case_64: Option<ChunkingTestCase>,
+    pub case_128: Option<ChunkingTestCase>,
+    pub case_256: Option<ChunkingTestCase>,
+    pub case_512: Option<ChunkingTestCase>,
+    pub case_768: Option<ChunkingTestCase>,
+    pub case_1024: Option<ChunkingTestCase>,
+    pub case_1536: Option<ChunkingTestCase>,
+    pub case_2048: Option<ChunkingTestCase>,
+}
+impl ChunkingTestCases {
+    pub fn case(&self, case: u32) -> ChunkingTestCase {
+        match case {
+            64 => self.case_64.clone().unwrap(),
+            128 => self.case_128.clone().unwrap(),
+            256 => self.case_256.clone().unwrap(),
+            512 => self.case_512.clone().unwrap(),
+            768 => self.case_768.clone().unwrap(),
+            1024 => self.case_1024.clone().unwrap(),
+            1536 => self.case_1536.clone().unwrap(),
+            2048 => self.case_2048.clone().unwrap(),
+            _ => panic!("Invalid case"),
+        }
+    }
+}
+
+macro_rules! generate_chunking_structs {
+    ($($file:ident),+) => {
+        pub struct Chunking {
+            $(
+                pub $file: $file,
+            )+
+        }
+        $(
+            #[allow(non_camel_case_types)]
+            #[derive(Serialize, Deserialize)]
+            pub struct $file {
+                pub content: String,
+                pub test_cases: ChunkingTestCases,
+
+            }
+            impl $file {
+                fn load_chunking_texts() -> Self {
+                    let file_name = format!("{}.json", stringify!($file).to_lowercase());
+                    let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
+                    let file_path = PathBuf::from(cargo_manifest_dir)
+                        .join("src")
+                        .join("text_utils")
+                        .join("test_text")
+                        .join("chunking")
+                        .join(file_name);
+                    let content = fs::read_to_string(&file_path).expect("Failed to read file");
+                    serde_json::from_str(&content).expect("Failed to parse JSON")
+                }
+
+            }
+        )+
+        impl Chunking {
+            fn load_chunking_texts() -> Self {
+                Self {
+                    $(
+                        $file: $file::load_chunking_texts(),
+                    )+
+                }
+            }
+        }
+    };
+}
+
+generate_chunking_structs!(chunking_tiny, chunking_small);
+
+macro_rules! generate_text_structs {
+    ($($file:ident),+) => {
+        pub struct Text {
+            $(
+                pub $file: $file,
+            )+
+        }
+        $(
+            #[allow(non_camel_case_types)]
+            pub struct $file {
+                pub content: String,
+            }
+            impl $file {
+                fn load_text() -> Self {
+                    let file_name = format!("{}.txt", stringify!($file).to_lowercase());
+                    let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
+                    let file_path = PathBuf::from(cargo_manifest_dir)
+                        .join("src")
+                        .join("text_utils")
+                        .join("test_text")
+                        .join("text")
+                        .join(file_name);
+                    let content = fs::read_to_string(&file_path).expect("Failed to read file");
+                    Self { content }
+                }
+            }
+        )+
+        impl Text {
+            fn load_text() -> Self {
+                Self {
+                    $(
+                        $file: $file::load_text(),
+                    )+
+                }
+            }
+        }
+    };
+}
+
+generate_text_structs!(smollest, tiny, small, medium, long, really_long);
 
 lazy_static! {
-    pub static ref BNF: Bnf = Bnf::load();
-    pub static ref DOOM: Doom = Doom::load();
-    pub static ref LONG: Long = Long::load();
-    pub static ref MACOMBER: Macomber = Macomber::load();
-    pub static ref ROMEO_JULIET: Romeo_Juliet = Romeo_Juliet::load();
-    pub static ref TURING: Turing = Turing::load();
-    pub static ref SHAKE: Shake = Shake::load();
-    pub static ref KATANA: Katana = Katana::load();
+    pub static ref SPLIT_TESTS: Splitting = Splitting::load_splitting_texts();
+    pub static ref CHUNK_TESTS: Chunking = Chunking::load_chunking_texts();
+    pub static ref TEXT: Text = Text::load_text();
 }

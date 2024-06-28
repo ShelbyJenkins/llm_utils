@@ -1,19 +1,19 @@
-use fancy_regex::Regex;
 use lazy_static::lazy_static;
-use std::borrow::Cow;
+use regex::Regex;
 
 #[derive(Default)]
 pub enum Newlines {
     Space,
     Single,
     #[default]
-    Double,
+    TwoPlus,
     None,
 }
 #[derive(Default)]
 pub struct TextCleaner {
     pub newlines: Newlines,
     pub remove_non_basic_ascii: bool,
+    pub remve_citations: bool,
 }
 impl TextCleaner {
     pub fn new() -> Self {
@@ -36,7 +36,7 @@ impl TextCleaner {
     }
 
     pub fn reduce_newlines_to_double_newline(mut self) -> Self {
-        self.newlines = Newlines::Double;
+        self.newlines = Newlines::TwoPlus;
         self
     }
 
@@ -45,32 +45,34 @@ impl TextCleaner {
         self
     }
 
+    pub fn remove_citations(mut self) -> Self {
+        self.remve_citations = true;
+        self
+    }
+
     pub fn run(&self, text: &str) -> String {
-        let mut text = Cow::Borrowed(text);
+        let text = END_OF_LINE_REGEX.replace_all(text, "\n");
+        let text = END_OF_PARAGRAPH_REGEX.replace_all(&text, "\n\n");
+        let text = WHITE_SPACE_REGEX.replace_all(&text, " ");
 
-        text = Cow::Owned(END_OF_LINE_REGEX.replace_all(&text, "\n").into_owned());
-        text = Cow::Owned(
-            END_OF_PARAGRAPH_REGEX
-                .replace_all(&text, "\n\n")
-                .into_owned(),
-        );
-        text = Cow::Owned(WHITE_SPACE_REGEX.replace_all(&text, " ").into_owned());
-
-        text = match self.newlines {
-            Newlines::Space => {
-                Cow::Owned(SINGLE_NEWLINE_REGEX.replace_all(&text, " ").into_owned())
-            }
-            Newlines::Single => {
-                Cow::Owned(SINGLE_NEWLINE_REGEX.replace_all(&text, "\n").into_owned())
-            }
-            Newlines::Double => {
-                Cow::Owned(DOUBLE_NEWLINE_REGEX.replace_all(&text, "\n\n").into_owned())
-            }
+        let text = match self.newlines {
+            Newlines::Space => SINGLE_NEWLINE_REGEX.replace_all(&text, " "),
+            Newlines::Single => SINGLE_NEWLINE_REGEX.replace_all(&text, "\n"),
+            Newlines::TwoPlus => TWO_PLUS_NEWLINE_REGEX.replace_all(&text, "\n\n"),
             Newlines::None => text,
         };
-        if self.remove_non_basic_ascii {
-            text = Cow::Owned(UNWANTED_CHARS_REGEX.replace_all(&text, "").into_owned());
-        }
+
+        let text = if self.remove_non_basic_ascii {
+            UNWANTED_CHARS_REGEX.replace_all(&text, "")
+        } else {
+            text
+        };
+
+        let text = if self.remve_citations {
+            CITATIONS_REGEX.replace_all(&text, "")
+        } else {
+            text
+        };
 
         SINGLE_SPACE_REGEX
             .replace_all(&text, " ")
@@ -80,16 +82,16 @@ impl TextCleaner {
 }
 
 pub fn normalize_whitespace(text: &str) -> String {
-    let text = END_OF_LINE_REGEX.replace_all(text, "\n").to_string();
-    let text = END_OF_PARAGRAPH_REGEX
-        .replace_all(&text, "\n\n")
-        .to_string();
+    let text = END_OF_LINE_REGEX.replace_all(text, "\n");
+    let text = END_OF_PARAGRAPH_REGEX.replace_all(&text, "\n\n");
     WHITE_SPACE_REGEX.replace_all(&text, " ").to_string()
 }
 
 pub fn strip_unwanted_chars(text: &str) -> String {
-    UNWANTED_CHARS_REGEX.replace_all(text, "").to_string();
-    text.trim().to_string()
+    UNWANTED_CHARS_REGEX
+        .replace_all(text, "")
+        .trim()
+        .to_string()
 }
 
 pub fn reduce_to_single_whitespace(text: &str) -> String {
@@ -106,15 +108,16 @@ lazy_static! {
     //
     static ref END_OF_LINE_SEQUENCES: Vec<&'static str> = vec![
         // Ascii
-        r"\r\n", // Windows // This must be first to avoid matching \r
-        r"\r",   // MacOS
-        r"\v",   // Vertical tab
-        r"\f",   // Form feed
+        r"(\\r\\n|\r\n)", // Windows // This must be first to avoid matching \r
+        r"(\\r|\r)",       // MacOS
+        r"(\\v|\v)",       // Vertical tab
+        r"(\\f|\f)",       // Form feed
+        r"\\n",       // Literal
         // Unicode
         r"\u{2028}",
-        ];
+    ];
     static ref END_OF_LINE_REGEX: Regex = Regex::new(&END_OF_LINE_SEQUENCES.join("|")).unwrap();
-    static ref SINGLE_NEWLINE_REGEX: Regex = Regex::new(r" \n{1,}|\n{1,} |\n{1,}").unwrap();
+    static ref SINGLE_NEWLINE_REGEX: Regex = Regex::new(r"\n{1,}").unwrap();
     //
     // Paragraphs
     //
@@ -123,13 +126,14 @@ lazy_static! {
         r"\u{2029}",
         ];
     static ref END_OF_PARAGRAPH_REGEX: Regex = Regex::new(&END_OF_PARAGRAPH_SEQUENCES.join("|")).unwrap();
-    static ref DOUBLE_NEWLINE_REGEX: Regex = Regex::new(r" \n{2,}|\n{2,} |\n{2,}").unwrap();
+    static ref TWO_PLUS_NEWLINE_REGEX: Regex = Regex::new(r"\n{2,}").unwrap();
     //
     // White space
     //
     static ref WHITE_SPACE_SEQUENCES: Vec<&'static str> = vec![
         // Ascii
-        r"\t",
+        r"\\s",
+        r"(\\t|\t)",
         // Unicode
         r"\u{0020}",
         r"\u{00A0}",
@@ -157,6 +161,7 @@ lazy_static! {
     // Unwanted characters
     //
     static ref UNWANTED_CHARS_REGEX: Regex = Regex::new(r#"[^a-zA-Z0-9.,?!:;'\"\-\(\)\[\]\{\}$&@#%^*()\s]+"#).unwrap();
+    static ref CITATIONS_REGEX: Regex = Regex::new(r"\[\d{1,3}\]").unwrap();
 }
 
 #[cfg(test)]
@@ -165,22 +170,23 @@ mod tests {
 
     #[test]
     fn test_normalize_whitespace() {
-        let ascii_text = "Ascii\tspaces here. Unicode\u{00A0}spaces here.";
-        let ascii_result = "Ascii spaces here. Unicode spaces here.";
+        let ascii_text = "Ascii\tspaces here. Unicode\u{00A0}spaces here. Literal\\sspaces\\t.";
+        let ascii_result = "Ascii spaces here. Unicode spaces here. Literal spaces .";
         assert_eq!(normalize_whitespace(ascii_text), ascii_result);
         let ascii_text = "Ascii\nnewlines
-. Unicode\u{2028}newlines. ";
-        let ascii_result = "Ascii\nnewlines\n. Unicode\nnewlines.\n";
+. Unicode\u{2028}newlines. . Literal\\nnewlines.\\n";
+        let ascii_result = "Ascii\nnewlines\n. Unicode\nnewlines.\n. Literal\nnewlines.\n";
         assert_eq!(normalize_whitespace(ascii_text), ascii_result);
-        let ascii_text = "Ascii\n\nparagraphs\r\n\r\n.Unicode\u{2029}paragraphs. ";
-        let ascii_result = "Ascii\n\nparagraphs\n\n.Unicode\n\nparagraphs.\n\n";
+        let ascii_text = "Ascii\n\nparagraphs\r\n\r\n.Unicode\u{2029}paragraphs.  Literal\\n\\nparagraphs.\\r\\n\\r\\n";
+        let ascii_result =
+            "Ascii\n\nparagraphs\n\n.Unicode\n\nparagraphs.\n\n Literal\n\nparagraphs.\n\n";
         assert_eq!(normalize_whitespace(ascii_text), ascii_result);
     }
 
     #[test]
     fn test_clean_to_single_spaces() {
         let ascii_text =
-            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\n And of course, newlines.\n\n";
+            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\n And\nof course, newlines.\n\n";
         let ascii_result = "Ascii spaces here. Unicode spaces here. And of course, newlines.";
         assert_eq!(
             TextCleaner::new()
@@ -193,7 +199,7 @@ mod tests {
     #[test]
     fn test_clean_to_single_newlines() {
         let ascii_text =
-            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\n And of course, newlines.\n\n Cool.";
+            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\nAnd of course, newlines.\n\nCool.";
         let ascii_result =
             "Ascii spaces here. Unicode spaces here.\nAnd of course, newlines.\nCool.";
         assert_eq!(
@@ -207,7 +213,7 @@ mod tests {
     #[test]
     fn test_clean_to_double_newlines() {
         let ascii_text =
-            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\n\nAscii\n\nparagraphs.\r\n\r\n Unicode\u{2029}paragraphs. Cool.";
+            "Ascii\tspaces here. Unicode\u{00A0}spaces here.\n\nAscii\n\nparagraphs.\r\n\r\nUnicode\u{2029}paragraphs. Cool.";
         let ascii_result =
             "Ascii spaces here. Unicode spaces here.\n\nAscii\n\nparagraphs.\n\nUnicode\n\nparagraphs.\n\nCool.";
         assert_eq!(

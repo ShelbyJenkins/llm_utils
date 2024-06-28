@@ -1,10 +1,10 @@
-# llm_utils 
-A Swiss army knife for working with LLMs. Features supporting Llama.cpp, Openai, Anthropic, Mistral-rs. Originally made for the llm_client crate, but split into it's own crate just for you.
+# llm_utils: no chains - just tools
 
-* Estimate GGUF Vram usage.
-* Clean and chunk HTML and text.
-* Build grammars for Llama.cpp.
-* Ensure your prompts are within LLM token limits.
+* Tokenizers for major open source models.
+* *Balanced* SotA text chunker with a fast, parallelized implementation.
+* Presets for loading models locally. Calculates the best quant for your GPU.
+* Advance prompting tools; chat templates for open source models or OpenAI/Anthropic models, accurately count prompt tokens, and build grammars and logit biases.
+* Parse and clean HTML and text.
 
 ### Installation
 ```toml
@@ -43,42 +43,30 @@ llm_utils = "*"
     let word_probably: String = tokenizer.try_from_single_token_id(1234);
 ```
 
-### Text utils 📝
+### Text chunking 🪓
+
+Balanced text chunking means that all chunks are approximately the same size. 
 
 ```rust
-    // Normalize whitespace chars to " " and "\n".
-    // Reduce the number of newlines to singles or doubles (paragraphs) or convert them to " ".
-    // Optionally, remove all characters besides alphabetic, numbers, and punctuation. 
-    //
-    let mut text_cleaner: String = llm_utils::text_utils::clean_text::TextCleaner::new();
-    let cleaned_text: String = text_cleaner
-        .reduce_newlines_to_single_space()
-        .remove_non_basic_ascii()
-        .run(some_dirty_text);
+    let text = "one, two, three, four, five, six, seven, eight, nine";
 
-    // Convert HTML to cleaned text.
-    // Uses an implementation of Mozilla's readability mode and HTML2Text.
-    //
-    let cleaned_text: String = llm_utils::text_utils::clean_html::clean_html(raw_html);
+    // Give a max token count of four, other text chunkers would split this into three chunks.
+    assert_eq!(["one, two, three, four", "five, six, seven, eight", "nine"], // "nine" is orphaned!
+        OtherChunkers::new()
+        .max_chunk_token_size(4)
+        .Chunk(text));
 
-    // Rule based text segmentation for sentences. 
-    // Better than unicode-segmentation crate or any other crate I tested.
-    // But still not as good as a model based approach like Spacy or other NLP libraries.
-    //
-    let sentence_splits: Vec<String> = 
-        llm_utils::text_utils::split::split_text_into_sentences_regex(some_dirty_text);
-
-    // Split text into balanced chunks as close to the given size as possible.
-    // Unlike other implementations this method attempts to keep the chunks the same size.
-    // This means you won't end up with an orphan final chunk that is too small to be useful.
-    // Implemented with a DFS algo, recursion, memoziation, and heuristic pre-filters.
-    // Attempts to split semantically in the following order:
-    // Paragraphs, newlines, sentences, words, and finally graphmemes.
-    // Please note: this is much slower than other methods. It needs optimizations!
-    //
-    let chunked_text: Vec<String> = 
-        llm_utils::text_utils::chunk::chunk_text(text, chunk_size, Some(overlap_percent));
+    // A balanced text chunker, however, would also split the text into three chunks, but of even sizes.
+    assert_eq!(["one, two, three", "four, five, six", "seven, eight, nine"], 
+        TextChunker::new()
+        .max_chunk_token_size(4)
+        .run(&text)?);
+       
 ```
+
+As long as the the total token length of the incoming text is not evenly divisible by they max token count, the final chunk will be smaller than the others. In some cases it will be so small it will be "orphaned" and rendered useless. If you asked your RAG implementation `What did seven eat?`, that final chunk that answers the question would not be retrievable. 
+
+The TextChunker first attempts to split semantically in the following order: Paragraphs, newlines, sentences. If that fails it builds chunks linearlly by using the largest available splits, and splitting where needed.
 
 ### Model presets 🛤️
 
@@ -278,7 +266,75 @@ Supported Open Source models:
     let llama_logit_bias = logit_bias::convert_logit_bias_to_llama_format(&validated_logit_bias)?;
 ```
 
+### Text segmentation 🔪
 
+Split text by paragraphs, sentences, words, and graphemes.
+
+```rust
+
+
+    let paragraph_splits: Vec<String> =  TextSplitter::new()
+        .on_two_plus_newline()
+        .split_text(&text)?;
+
+    let newline_splits: Vec<String> =  TextSplitter::new()
+        .on_single_newline()
+        .split_text(&text)?;
+
+    // There is no good implementation sentence splitting in Rust!
+    // This implementation is better than unicode-segmentation crate or any other crate I tested.
+    // But still not as good as a model based approach like Spacy or other NLP libraries.
+    //
+    let sentence_splits: Vec<String> =  TextSplitter::new()
+        .on_sentences_rule_based()
+        .split_text(&text)?;
+
+    // Unicode
+
+    let sentence_splits: Vec<String> =  TextSplitter::new()
+        .on_sentences_unicode()
+        .split_text(&text)?;
+
+    let word_splits: Vec<String> =  TextSplitter::new()
+        .on_words_unicode()
+        .split_text(&text)?;
+
+    
+    let graphemes_splits: Vec<String> =  TextSplitter::new()
+        .on_graphemes_unicode()
+        .split_text(&text)?;
+
+    // If the split separator produces less than two splits,
+    // this mode tries the next separator.
+    // It does this until it produces more than one split.
+    //
+    let paragraph_splits: Vec<String> =  TextSplitter::new()
+        .on_two_plus_newline()
+        .recursive(true)
+        .split_text(&text)?;
+
+       
+```
+
+### Text cleaning 📝
+
+```rust
+    // Normalizes all whitespace chars .
+    // Reduce the number of newlines to singles or doubles (paragraphs) or convert them to " ".
+    // Optionally, remove all characters besides alphabetic, numbers, and punctuation. 
+    //
+    let mut text_cleaner: String = llm_utils::text_utils::clean_text::TextCleaner::new();
+    let cleaned_text: String = text_cleaner
+        .reduce_newlines_to_single_space()
+        .remove_non_basic_ascii()
+        .run(some_dirty_text);
+
+    // Convert HTML to cleaned text.
+    // Uses an implementation of Mozilla's readability mode and HTML2Text.
+    //
+    let cleaned_text: String = llm_utils::text_utils::clean_html::clean_html(raw_html);
+
+```
 
 ### License
 

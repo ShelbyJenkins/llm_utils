@@ -33,7 +33,7 @@ pub struct LlmTokenizer {
 impl LlmTokenizer {
     pub fn new_tiktoken(model_id: &str) -> Self {
         let tokenizer = get_bpe_from_model(model_id).unwrap();
-        let white_space_token_id = tokenizer.encode_ordinary(" ").remove(0) as u32;
+        let white_space_token_id = u32::try_from(tokenizer.encode_ordinary(" ").remove(0)).unwrap();
         Self {
             tokenizer: TokenizerBackend::Tiktoken(tokenizer),
             tokenizer_path: None,
@@ -73,7 +73,7 @@ impl LlmTokenizer {
 
     pub fn count_tokens(&self, str: &str) -> u32 {
         let tokens = self.tokenize(str);
-        tokens.len() as u32
+        u32::try_from(tokens.len()).unwrap()
     }
 
     pub fn try_from_single_token_id(&self, try_from_single_token_id: u32) -> Result<String> {
@@ -160,29 +160,18 @@ impl LlmTokenizer {
         self.detokenize_many(preserved_tokens).unwrap()
     }
 
-    pub fn chunk_text(
-        &self,
-        text: &str,
-        max_length: usize,
-        overlap_percent: Option<usize>,
-    ) -> Vec<String> {
-        let mut splitter =
-            crate::text_utils::chunk::DFSTextSplitter::new(max_length, overlap_percent, self);
-        splitter.run(text).unwrap()
-    }
-
     fn encode_tiktoken(&self, tokenizer: &CoreBPE, str: &str) -> Vec<u32> {
         let tokens = if self.with_special_tokens {
             tokenizer
                 .encode_with_special_tokens(str)
                 .iter()
-                .map(|&x| x as u32)
+                .map(|&x| u32::try_from(x).unwrap())
                 .collect()
         } else {
             tokenizer
                 .encode_ordinary(str)
                 .iter()
-                .map(|&x| x as u32)
+                .map(|&x| u32::try_from(x).unwrap())
                 .collect()
         };
         tokens

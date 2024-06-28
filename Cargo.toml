@@ -1,14 +1,14 @@
 [package]
 authors=["Shelby Jenkins"]
-description="A Swiss army knife for LLMs with features for Llama.cpp, Openai, Anthropic, Mistral-rs."
+description="A Swiss army knife for LLMs: no chains - just tools."
 edition="2021"
 homepage="https://github.com/shelbyJenkins/llm_utils"
 name="llm_utils"
 readme="README.md"
-version="0.0.6"
+version="0.0.7"
 
 categories=["multimedia::encoding", "science"]
-keywords=["anthropic", "gguf", "llm", "nlp", "openai"]
+keywords=["chunking", "gguf", "llm", "nlp", "tokenizer"]
 license="MIT"
 repository="https://github.com/shelbyJenkins/llm_utils"
 
@@ -16,17 +16,21 @@ repository="https://github.com/shelbyJenkins/llm_utils"
 anyhow="1.0.86"
 article_scraper="2.1.0"
 dotenv="0.15.0"
-fancy-regex="0.13.0"
 gbnf="0.1.7"
 gguf-rs="0.1.3"
 hf-hub={version="0.3.2"}
 html2text="0.12.5"
 lazy_static="1.4.0"
 minijinja="2.0.1"
+rayon="1.10.0"
 regex="1.10.4"
 serde={version="1.0.202"}
 serde_json="1.0.117"
 tiktoken-rs="0.5.9"
 tokenizers="0.19.1"
 toml="0.8.14"
+unicode-properties="0.1.1"
 unicode-segmentation="1.11.0"
+
+[dev-dependencies]
+text-splitter={version="0.14.0", features=["tiktoken-rs"]}

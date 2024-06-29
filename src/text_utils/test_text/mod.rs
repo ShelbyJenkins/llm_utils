@@ -194,7 +194,7 @@ macro_rules! generate_text_structs {
     };
 }
 
-generate_text_structs!(smollest, tiny, small, medium, long, really_long);
+generate_text_structs!(smollest, tiny, small, medium, long, really_long, html_short);
 
 lazy_static! {
     pub static ref SPLIT_TESTS: Splitting = Splitting::load_splitting_texts();

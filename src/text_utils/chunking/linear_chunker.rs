@@ -185,7 +185,7 @@ impl LinearChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::LlmPreset, text_utils::test_text::*};
+    use crate::{models::open_source_model::preset::LlmPreset, text_utils::test_text::*};
 
     fn runner(
         tokenizer: &Arc<LlmTokenizer>,
@@ -220,7 +220,7 @@ mod tests {
         let absolute_length_max = 5;
 
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
 
         for separator in Separator::get_all() {
             let mut chunks =
@@ -230,7 +230,7 @@ mod tests {
                 assert_eq!(chunk, test_cases[i]);
             }
         }
-        let tokenizer: Arc<LlmTokenizer> = Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer());
+        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
         for separator in Separator::get_all() {
             let mut chunks =
                 runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
@@ -254,12 +254,12 @@ mod tests {
         let absolute_length_max = 1024;
 
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
 
         for separator in separators.clone() {
             let _ = runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
         }
-        let tokenizer: Arc<LlmTokenizer> = Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer());
+        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
         for separator in separators {
             let _ = runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
         }
@@ -270,6 +270,7 @@ mod tests {
         let incoming_text = &TEXT.long.content;
         let absolute_length_max = 1024;
         let mut res = TextChunker::new()
+            .unwrap()
             .max_chunk_token_size(absolute_length_max)
             .use_dfs_semantic_splitter(false)
             .run_return_result(incoming_text)

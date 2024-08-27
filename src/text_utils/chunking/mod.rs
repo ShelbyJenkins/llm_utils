@@ -19,6 +19,7 @@ use std::{
         Arc,
     },
 };
+use anyhow::Result;
 
 /// An easy alternative to the [`TextChunker`] struct.  
 /// 
@@ -29,12 +30,12 @@ pub fn chunk_text(
     text: &str,
     max_chunk_token_size: u32,
     overlap_percent: Option<f32>,
-) -> Option<Vec<String>> {
-    let mut splitter = TextChunker::new().max_chunk_token_size(max_chunk_token_size);
+) -> Result<Option<Vec<String>>> {
+    let mut splitter = TextChunker::new()?.max_chunk_token_size(max_chunk_token_size);
     if let Some(overlap_percent) = overlap_percent {
         splitter = splitter.overlap_percent(overlap_percent);
     }
-    splitter.run(text)
+    Ok(splitter.run(text))
 }
 
 
@@ -56,24 +57,18 @@ pub struct TextChunker {
     use_dfs_semantic_splitter: bool,
 }
 
-impl Default for TextChunker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl TextChunker {
     /// Creates a new instance of the [`TextChunker`] struct using the default TikToken tokenizer.
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             tokenizer: Arc::new(LlmTokenizer::new_tiktoken(
                 TOKENIZER_TIKTOKEN_DEFAULT,
-            )),
+            )?),
             absolute_length_max: ABSOLUTE_LENGTH_MAX_DEFAULT,
             absolute_length_min: None,
             overlap_percent: None,
             use_dfs_semantic_splitter: true,
-        }
+        })
     }
     /// Creates a new instance of the [`TextChunker`] struct using a custom tokenizer. For example a Hugging Face tokenizer.
     pub fn new_with_tokenizer(custom_tokenizer: &Arc<LlmTokenizer>) -> Self {
@@ -555,15 +550,15 @@ impl std::fmt::Debug for ChunkerResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::LlmPreset, text_utils::test_text::*};
-    use anyhow::Result;
+    use crate::text_utils::test_text::*;
+    use crate::models::open_source_model::preset::LlmPreset;
 
     fn run_test(case: u32, content: &str, tokenizer: &Arc<LlmTokenizer>) -> Option<ChunkerResult> {
-        let res = TextChunker::new_with_tokenizer(tokenizer)
+       TextChunker::new_with_tokenizer(tokenizer)
         .max_chunk_token_size(case)
-        .run_return_result(content);
-        println!("{:#?}", res.as_ref().unwrap());
-        res
+        .run_return_result(content)
+        // println!("{:#?}", res.as_ref().unwrap());
+    
     }
 
     fn check_first(case: u32, res: &mut ChunkerResult, test_cases: &ChunkingTestCases) -> Result<()> {
@@ -590,11 +585,11 @@ mod tests {
     }
 
     fn tiktoken() -> Arc<LlmTokenizer> {
-        Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT))
+        Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap())
     }
 
     fn hf() -> Arc<LlmTokenizer> {
-       Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer())
+        LlmPreset::Llama3_8bInstruct.tokenizer().unwrap()
     }
     
     #[test]
@@ -674,7 +669,7 @@ mod tests {
 
     #[test]
     fn within_abs_max() {
-        let  res = TextChunker::new()
+        let  res = TextChunker::new().unwrap()
             .max_chunk_token_size(400)
             .run_return_result(&CHUNK_TESTS.chunking_tiny.content)
             .unwrap();

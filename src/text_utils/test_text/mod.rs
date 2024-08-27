@@ -1,6 +1,5 @@
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::LazyLock};
 
 macro_rules! generate_splitting_structs {
     ($($file:ident),+) => {
@@ -94,6 +93,7 @@ pub struct ChunkingTestCases {
     pub case_1536: Option<ChunkingTestCase>,
     pub case_2048: Option<ChunkingTestCase>,
 }
+
 impl ChunkingTestCases {
     pub fn case(&self, case: u32) -> ChunkingTestCase {
         match case {
@@ -194,10 +194,19 @@ macro_rules! generate_text_structs {
     };
 }
 
-generate_text_structs!(smollest, tiny, small, medium, long, really_long, html_short);
+generate_text_structs!(
+    smollest,
+    tiny,
+    small,
+    medium,
+    long,
+    really_long,
+    html_short,
+    many_subjects,
+    one_subject_many_topics,
+    one_subject_one_topic
+);
 
-lazy_static! {
-    pub static ref SPLIT_TESTS: Splitting = Splitting::load_splitting_texts();
-    pub static ref CHUNK_TESTS: Chunking = Chunking::load_chunking_texts();
-    pub static ref TEXT: Text = Text::load_text();
-}
+pub static SPLIT_TESTS: LazyLock<Splitting> = LazyLock::new(Splitting::load_splitting_texts);
+pub static CHUNK_TESTS: LazyLock<Chunking> = LazyLock::new(Chunking::load_chunking_texts);
+pub static TEXT: LazyLock<Text> = LazyLock::new(Text::load_text);

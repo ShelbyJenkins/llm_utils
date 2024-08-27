@@ -1,5 +1,4 @@
 use anyhow::Result;
-// use article_scraper::Readability;
 use html2text::{config, render::text_renderer::TrivialDecorator};
 use readability::extractor;
 use std::io::Cursor;

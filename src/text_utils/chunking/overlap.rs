@@ -1,5 +1,5 @@
 use super::*;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 
 /// Adds overlap to chunks built by the [`TextChunker`].
 pub struct OverlapChunker {
@@ -216,8 +216,7 @@ impl OverlapChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::LlmPreset, text_utils::test_text};
-
+    use crate::{models::open_source_model::preset::LlmPreset, text_utils::test_text};
     #[test]
     fn test_overlap() {
         let test_cases = [
@@ -230,7 +229,7 @@ mod tests {
         let absolute_length_max = 12;
 
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)
@@ -241,7 +240,7 @@ mod tests {
             assert_eq!(chunk, test_cases[i]);
         }
 
-        let tokenizer: Arc<LlmTokenizer> = Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer());
+        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)
@@ -259,7 +258,7 @@ mod tests {
         let absolute_length_max = 1024;
 
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)
@@ -267,7 +266,7 @@ mod tests {
             .unwrap();
         assert!(res.token_counts().iter().all(|&x| x <= absolute_length_max));
 
-        let tokenizer: Arc<LlmTokenizer> = Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer());
+        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)

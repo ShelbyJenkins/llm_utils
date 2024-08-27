@@ -1,6 +1,5 @@
-use lazy_static::lazy_static;
 use regex::Regex;
-use std::ops::Range;
+use std::{ops::Range, sync::LazyLock};
 use unicode_properties::{GeneralCategory, GeneralCategoryGroup, UnicodeGeneralCategory};
 
 pub fn split_text_into_sentences(text: &str, keep_separator: bool) -> Vec<String> {
@@ -27,8 +26,7 @@ pub fn split_text_into_indices(text: &str, keep_separator: bool) -> Vec<Range<us
     indices
 }
 
-// This is taken from https://github.com/indicium-ag/readability-text-cleanup-rs/blob/master/src/katana.rs
-// However, the original code is not available in the crate as it does not export it!
+// Modified from https://github.com/indicium-ag/readability-text-cleanup-rs/blob/master/src/katana.rs
 fn cut(mut text: String, keep_separator: bool) -> Vec<String> {
     remove_composite_abbreviations(&mut text);
     remove_suspension_points(&mut text);
@@ -192,50 +190,56 @@ fn repair_sentences(sentences: Vec<String>) -> Vec<String> {
     repaired_sentences
 }
 
-lazy_static! {
-    static ref REMOVE_COMPOSITE_ABBREVIATIONS: Regex =
-        Regex::new(r"(?P<comp>et al\.)(?:\.)").unwrap();
-    static ref REMOVE_SUSPENSION_POINTS: Regex = Regex::new(r"\.{3}").unwrap();
-    static ref REMOVE_FLOATING_POINT_NUMBERS: Regex =
-        Regex::new(r"(?P<number>[0-9]+)\.(?P<decimal>[0-9]+)").unwrap();
-    static ref HANDLE_FLOATS_WITHOUT_LEADING_ZERO: Regex =
-        Regex::new(r"\s\.(?P<nums>[0-9]+)").unwrap();
-    static ref REMOVE_ABBREVIATIONS: Regex = Regex::new(r"(?:[A-Za-z]\.){2,}").unwrap();
-    static ref REMOVE_INITIALS: Regex = Regex::new(r"(?P<init>[A-Z])(?P<point>\.)").unwrap();
-    static ref UNSTICK_SENTENCES: Regex =
-        Regex::new(r##"(?P<left>[^.?!]\.|!|\?)(?P<right>[^\s"'])"##).unwrap();
-    static ref REMOVE_SENTENCE_ENDERS_BEFORE_PARENS: Regex =
-        Regex::new(r##"(?P<bef>[.?!])\s?\)"##).unwrap();
-    static ref QUOTE_TRANSFORMATIONS: Vec<(Regex, &'static str)> = vec![
+pub static REMOVE_COMPOSITE_ABBREVIATIONS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?P<comp>et al\.)(?:\.)").unwrap());
+pub static REMOVE_SUSPENSION_POINTS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\.{3}").unwrap());
+pub static REMOVE_FLOATING_POINT_NUMBERS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?P<number>[0-9]+)\.(?P<decimal>[0-9]+)").unwrap());
+pub static HANDLE_FLOATS_WITHOUT_LEADING_ZERO: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s\.(?P<nums>[0-9]+)").unwrap());
+pub static REMOVE_ABBREVIATIONS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?:[A-Za-z]\.){2,}").unwrap());
+pub static REMOVE_INITIALS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?P<init>[A-Z])(?P<point>\.)").unwrap());
+pub static UNSTICK_SENTENCES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r##"(?P<left>[^.?!]\.|!|\?)(?P<right>[^\s"'])"##).unwrap());
+pub static REMOVE_SENTENCE_ENDERS_BEFORE_PARENS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r##"(?P<bef>[.?!])\s?\)"##).unwrap());
+pub static QUOTE_TRANSFORMATIONS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+    vec![
         (
             Regex::new(r##"'(?P<quote>[.?!])\s?""##).unwrap(),
-            "&^&$quote"
+            "&^&$quote",
         ),
         (
             Regex::new(r##"'(?P<quote>[.?!])\s?""##).unwrap(),
-            "&**&$quote"
+            "&**&$quote",
         ),
         (
             Regex::new(r##"(?P<quote>[.?!])\s?""##).unwrap(),
-            "&=&$quote"
+            "&=&$quote",
         ),
         (
             Regex::new(r##"(?P<quote>[.?!])\s?'""##).unwrap(),
-            "&,&$quote"
+            "&,&$quote",
         ),
         (
             Regex::new(r##"(?P<quote>[.?!])\s?'"##).unwrap(),
-            "&##&$quote"
+            "&##&$quote",
         ),
         (Regex::new(r##"(?P<quote>[.?!])\s?""##).unwrap(), "&$quote"),
-    ];
-    static ref PAREN_REPAIR: Regex = Regex::new(r"&==&(?P<p>[.!?])").unwrap();
-    static ref QUOTE_REPAIR_REGEXES: [Regex; 6] = [
+    ]
+});
+pub static PAREN_REPAIR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"&==&(?P<p>[.!?])").unwrap());
+pub static QUOTE_REPAIR_REGEXES: LazyLock<[Regex; 6]> = LazyLock::new(|| {
+    [
         Regex::new(r"&\^&(?P<p>[.!?])").unwrap(),
         Regex::new(r"&\*\*&(?P<p>[.!?])").unwrap(),
         Regex::new(r"&=&(?P<p>[.!?])").unwrap(),
         Regex::new(r#"&,&(?P<p>[.!?])"#).unwrap(),
         Regex::new(r"&##&(?P<p>[.!?])").unwrap(),
         Regex::new(r"&\$&(?P<p>[.!?])").unwrap(),
-    ];
-}
+    ]
+});

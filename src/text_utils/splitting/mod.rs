@@ -1,6 +1,11 @@
 pub mod rule_based;
+use regex::Regex;
 pub use rule_based::split_text_into_indices;
-use std::{collections::VecDeque, ops::Range, sync::Arc};
+use std::{
+    collections::VecDeque,
+    ops::Range,
+    sync::{Arc, LazyLock},
+};
 
 #[derive(Default)]
 pub struct TextSplitter {
@@ -414,10 +419,9 @@ impl Separator {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref TWO_PLUS_NEWLINE_REGEX: regex::Regex = regex::Regex::new(r"\n{2,}").unwrap();
-    static ref SINGLE_NEWLINE_REGEX: regex::Regex = regex::Regex::new(r"\n").unwrap();
-}
+pub static TWO_PLUS_NEWLINE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\n{2,}").unwrap());
+pub static SINGLE_NEWLINE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n").unwrap());
 
 #[cfg(test)]
 mod tests {

@@ -35,7 +35,7 @@ pub fn chunk_text_with_text_splitter(
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
-    let tokenizer = crate::tokenizer::LlmTokenizer::new_tiktoken("gpt-4");
+    let tokenizer = crate::tokenizer::LlmTokenizer::new_tiktoken("gpt-4").unwrap();
 
     let dummy_config = Arc::new(ChunkerConfig {
         chunks_found: Arc::new(AtomicBool::new(true)),
@@ -102,7 +102,7 @@ mod tests {
     ) -> Vec<String> {
         let mut output_strings: Vec<String> = Vec::new();
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
 
         let title = format!(
             "Speed comparison for content: {}...\n content token_count: {}\nabsolute_length_max: {absolute_length_max}\noverlap_percent: {overlap_percent}",
@@ -184,14 +184,6 @@ mod tests {
                 smallest_token_size = token_count;
             }
         }
-        // format!(
-        //     "chunk_count: {}\navg_token_size: {}\nlargest_token_size: {}\nsmallest_token_size: {}\nchunks: {:?}",
-        //     res.chunks.len(),
-        //     all_chunks_token_count / u32::try_from(res.chunks.len()).unwrap(),
-        //     largest_token_size,
-        //     smallest_token_size,
-        //     chunks
-        // )
         format!(
             "chunk_count: {}\navg_token_size: {}\nlargest_token_size: {}\nsmallest_token_size: {}",
             res.chunks.len(),
@@ -208,7 +200,7 @@ mod tests {
     ) -> Vec<String> {
         let mut output_strings: Vec<String> = Vec::new();
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
 
         let title = format!(
             "Balance comparison for content: {}...\n content token_count: {}\nabsolute_length_max: {absolute_length_max}\noverlap_percent: {overlap_percent}",

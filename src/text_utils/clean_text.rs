@@ -1,5 +1,5 @@
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
 #[derive(Default)]
 pub enum Newlines {
@@ -102,35 +102,44 @@ pub fn reduce_to_single_whitespace(text: &str) -> String {
         .to_string()
 }
 
-lazy_static! {
-    //
-    // Newlines
-    //
-    static ref END_OF_LINE_SEQUENCES: Vec<&'static str> = vec![
+//
+// Newlines
+//
+pub static END_OF_LINE_SEQUENCES: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
+    vec![
         // Ascii
         r"(\\r\\n|\r\n)", // Windows // This must be first to avoid matching \r
-        r"(\\r|\r)",       // MacOS
-        r"(\\v|\v)",       // Vertical tab
-        r"(\\f|\f)",       // Form feed
-        r"\\n",       // Literal
+        r"(\\r|\r)",      // MacOS
+        r"(\\v|\v)",      // Vertical tab
+        r"(\\f|\f)",      // Form feed
+        r"\\n",           // Literal
         // Unicode
         r"\u{2028}",
-    ];
-    static ref END_OF_LINE_REGEX: Regex = Regex::new(&END_OF_LINE_SEQUENCES.join("|")).unwrap();
-    static ref SINGLE_NEWLINE_REGEX: Regex = Regex::new(r"\n{1,}").unwrap();
-    //
-    // Paragraphs
-    //
-    static ref END_OF_PARAGRAPH_SEQUENCES: Vec<&'static str> = vec![
+    ]
+});
+pub static END_OF_LINE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&END_OF_LINE_SEQUENCES.join("|")).unwrap());
+pub static SINGLE_NEWLINE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n{1,}").unwrap());
+
+//
+// Paragraphs
+//
+pub static END_OF_PARAGRAPH_SEQUENCES: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
+    vec![
         // Unicode
         r"\u{2029}",
-        ];
-    static ref END_OF_PARAGRAPH_REGEX: Regex = Regex::new(&END_OF_PARAGRAPH_SEQUENCES.join("|")).unwrap();
-    static ref TWO_PLUS_NEWLINE_REGEX: Regex = Regex::new(r"\n{2,}").unwrap();
-    //
-    // White space
-    //
-    static ref WHITE_SPACE_SEQUENCES: Vec<&'static str> = vec![
+    ]
+});
+pub static END_OF_PARAGRAPH_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&END_OF_PARAGRAPH_SEQUENCES.join("|")).unwrap());
+pub static TWO_PLUS_NEWLINE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\n{2,}").unwrap());
+
+//
+// White space
+//
+pub static WHITE_SPACE_SEQUENCES: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
+    vec![
         // Ascii
         r"\\s",
         r"(\\t|\t)",
@@ -154,15 +163,19 @@ lazy_static! {
         r"\u{205F}",
         r"\u{3000}",
         r"\u{0009}",
-        ];
-    static ref WHITE_SPACE_REGEX: Regex = Regex::new(&WHITE_SPACE_SEQUENCES.join("|")).unwrap();
-    static ref SINGLE_SPACE_REGEX: Regex = Regex::new(r" {1,}").unwrap();
-    //
-    // Unwanted characters
-    //
-    static ref UNWANTED_CHARS_REGEX: Regex = Regex::new(r#"[^a-zA-Z0-9.,?!:;'\"\-\(\)\[\]\{\}$&@#%^*()\s]+"#).unwrap();
-    static ref CITATIONS_REGEX: Regex = Regex::new(r"\[\d{1,3}\]").unwrap();
-}
+    ]
+});
+
+pub static WHITE_SPACE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&WHITE_SPACE_SEQUENCES.join("|")).unwrap());
+pub static SINGLE_SPACE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r" {1,}").unwrap());
+
+//
+// Unwanted characters
+//
+pub static UNWANTED_CHARS_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"[^a-zA-Z0-9.,?!:;'\"\-\(\)\[\]\{\}$&@#%^*()\s]+"#).unwrap());
+pub static CITATIONS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\d{1,3}\]").unwrap());
 
 #[cfg(test)]
 mod tests {

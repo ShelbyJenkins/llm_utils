@@ -1,4 +1,4 @@
-use crate::hf_loader::HuggingFaceLoader;
+use crate::models::open_source_model::hf_loader::{HfTokenTrait, HuggingFaceLoader};
 use anyhow::{anyhow, Result};
 use std::{fmt, path::PathBuf};
 use tiktoken_rs::{get_bpe_from_model, CoreBPE};
@@ -31,36 +31,40 @@ pub struct LlmTokenizer {
 }
 
 impl LlmTokenizer {
-    pub fn new_tiktoken(model_id: &str) -> Self {
-        let tokenizer = get_bpe_from_model(model_id).unwrap();
-        let white_space_token_id = u32::try_from(tokenizer.encode_ordinary(" ").remove(0)).unwrap();
-        Self {
+    pub fn new_tiktoken<T: AsRef<str>>(model_id: T) -> Result<Self> {
+        let tokenizer = get_bpe_from_model(model_id.as_ref())?;
+        let white_space_token_id = u32::try_from(tokenizer.encode_ordinary(" ").remove(0))?;
+        Ok(Self {
             tokenizer: TokenizerBackend::Tiktoken(tokenizer),
             tokenizer_path: None,
             with_special_tokens: false,
             white_space_token_id,
-        }
+        })
     }
 
-    pub fn new_from_tokenizer_json(tokenizer_json_path: &PathBuf) -> Self {
-        let tokenizer = HFTokenizer::from_file(tokenizer_json_path).unwrap();
+    pub fn new_from_tokenizer_json(tokenizer_json_path: &PathBuf) -> Result<Self> {
+        let tokenizer = HFTokenizer::from_file(tokenizer_json_path).map_err(|e| anyhow!(e))?;
         let white_space_token_id = tokenizer.encode(" ", false).unwrap().get_ids()[0];
-        Self {
+        Ok(Self {
             tokenizer: TokenizerBackend::HuggingFacesTokenizer(tokenizer),
             tokenizer_path: Some(tokenizer_json_path.clone()),
             with_special_tokens: false,
             white_space_token_id,
+        })
+    }
+
+    pub fn new_from_hf_repo(hf_token: Option<&str>, repo_id: &str) -> Result<Self> {
+        let mut api: HuggingFaceLoader = HuggingFaceLoader::new();
+        if let Some(hf_token) = hf_token {
+            *api.hf_token_mut() = Some(hf_token.to_owned());
         }
+
+        let tokenizer_json_path = api.load_file("tokenizer.json", repo_id)?;
+        LlmTokenizer::new_from_tokenizer_json(&tokenizer_json_path)
     }
 
-    pub fn new_from_hf_repo(hf_token: &Option<String>, repo_id: &str) -> Result<Self> {
-        let hf_loader = HuggingFaceLoader::new(hf_token.clone()).model_from_repo_id(repo_id);
-        let tokenizer_json_path: PathBuf = hf_loader.load_file("tokenizer.json")?;
-        Ok(LlmTokenizer::new_from_tokenizer_json(&tokenizer_json_path))
-    }
-
-    pub fn tokenize(&self, str: &str) -> Vec<u32> {
-        self.encode(str)
+    pub fn tokenize<T: AsRef<str>>(&self, str: T) -> Vec<u32> {
+        self.encode(str.as_ref())
     }
 
     pub fn detokenize_one(&self, token: u32) -> Result<String> {

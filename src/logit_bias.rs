@@ -1,6 +1,6 @@
 use crate::tokenizer::LlmTokenizer;
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 /// Validates the logit bias token IDs by checking if each token ID can be converted to a single token.
 ///
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 ///
 /// Returns `Result<(), anyhow::Error>` indicating success or an error if any of the token IDs are invalid.
 pub fn validate_logit_bias_token_ids(
-    tokenizer: &LlmTokenizer,
+    tokenizer: &Arc<LlmTokenizer>,
     logit_bias: &HashMap<u32, f32>,
 ) -> Result<()> {
     for token_id in logit_bias.keys() {
@@ -33,7 +33,7 @@ pub fn validate_logit_bias_token_ids(
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_chars(
-    tokenizer: &LlmTokenizer,
+    tokenizer: &Arc<LlmTokenizer>,
     logit_bias: &HashMap<char, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();
@@ -57,7 +57,7 @@ pub fn logit_bias_from_chars(
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_words(
-    tokenizer: &LlmTokenizer,
+    tokenizer: &Arc<LlmTokenizer>,
     logit_bias: &HashMap<String, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();
@@ -106,7 +106,7 @@ pub fn logit_bias_from_words(
 ///
 /// Returns `Result<HashMap<u32, f32>, anyhow::Error>` containing the converted logit biases.
 pub fn logit_bias_from_texts(
-    tokenizer: &LlmTokenizer,
+    tokenizer: &Arc<LlmTokenizer>,
     logit_bias: &HashMap<String, f32>,
 ) -> Result<HashMap<u32, f32>> {
     let mut token_logit_bias: HashMap<u32, f32> = HashMap::new();
@@ -173,7 +173,7 @@ pub fn validate_logit_bias_values(logit_bias: &HashMap<u32, f32>) -> Result<()> 
 /// Returns `Result<HashMap<String, serde_json::Value>, anyhow::Error>` containing the converted logit biases in the OpenAI format.
 pub fn convert_logit_bias_to_openai_format(
     logit_bias: &HashMap<u32, f32>,
-) -> Result<HashMap<String, serde_json::Value>> {
+) -> HashMap<String, serde_json::Value> {
     let mut openai_logit_bias: HashMap<String, serde_json::Value> = HashMap::new();
     for (token_id, value) in logit_bias {
         openai_logit_bias.insert(
@@ -181,7 +181,7 @@ pub fn convert_logit_bias_to_openai_format(
             serde_json::Value::Number(serde_json::Number::from(value.ceil() as i32)),
         );
     }
-    Ok(openai_logit_bias)
+    openai_logit_bias
 }
 
 /// Converts logit biases to the LLAMA format, where each logit bias is represented as a vector of two `serde_json::Value` elements: token ID and bias value.

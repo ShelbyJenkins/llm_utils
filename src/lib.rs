@@ -1,5 +1,5 @@
+#![feature(lazy_cell)]
 pub mod grammar;
-pub mod hf_loader;
 pub mod logit_bias;
 pub mod models;
 pub mod prompting;

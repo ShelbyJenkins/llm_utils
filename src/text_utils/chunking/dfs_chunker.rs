@@ -132,7 +132,7 @@ impl DfsTextChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::LlmPreset;
+    use crate::models::open_source_model::preset::LlmPreset;
 
     fn runner(tokenizer: &Arc<LlmTokenizer>, separator: Separator) -> Option<Vec<Chunk>> {
         let chunks_found: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
@@ -167,7 +167,7 @@ mod tests {
         ];
 
         let tokenizer: Arc<LlmTokenizer> =
-            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT));
+            Arc::new(LlmTokenizer::new_tiktoken(TOKENIZER_TIKTOKEN_DEFAULT).unwrap());
 
         for separator in separators.clone() {
             let mut chunks = runner(&tokenizer, separator).unwrap();
@@ -176,7 +176,7 @@ mod tests {
                 assert_eq!(chunk, test_cases[i]);
             }
         }
-        let tokenizer: Arc<LlmTokenizer> = Arc::new(LlmPreset::Llama3_8bInstruct.tokenizer());
+        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
         for separator in separators {
             let mut chunks = runner(&tokenizer, separator).unwrap();
             let chunks_string: Vec<String> = chunks.iter_mut().map(|chunk| chunk.text()).collect();

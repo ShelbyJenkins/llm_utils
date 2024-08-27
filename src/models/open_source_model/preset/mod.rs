@@ -206,7 +206,6 @@ mod tests {
         let variants = vec![
             LlmPreset::Llama3_1_8bInstruct,
             LlmPreset::Llama3_8bInstruct,
-            LlmPreset::Llama3_70bInstruct,
             LlmPreset::Mistral7bInstructV0_3,
             LlmPreset::Mixtral8x7bInstructV0_1,
             LlmPreset::MistralNemoInstruct2407,

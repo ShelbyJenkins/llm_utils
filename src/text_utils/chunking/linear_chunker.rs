@@ -185,7 +185,7 @@ impl LinearChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::open_source_model::preset::LlmPreset, text_utils::test_text::*};
+    use crate::{models::local_model::preset::LlmPreset, text_utils::test_text::*};
 
     fn runner(
         tokenizer: &Arc<LlmTokenizer>,
@@ -230,7 +230,11 @@ mod tests {
                 assert_eq!(chunk, test_cases[i]);
             }
         }
-        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
+        let tokenizer = LlmPreset::Llama3_1_8bInstruct
+            .load()
+            .unwrap()
+            .model_base
+            .tokenizer;
         for separator in Separator::get_all() {
             let mut chunks =
                 runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
@@ -259,7 +263,11 @@ mod tests {
         for separator in separators.clone() {
             let _ = runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
         }
-        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
+        let tokenizer = LlmPreset::Llama3_1_8bInstruct
+            .load()
+            .unwrap()
+            .model_base
+            .tokenizer;
         for separator in separators {
             let _ = runner(&tokenizer, separator, incoming_text, absolute_length_max).unwrap();
         }

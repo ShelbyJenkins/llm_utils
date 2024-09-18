@@ -69,12 +69,12 @@ macro_rules! grammar_default {
                 }
             }
 
-            pub fn set_stop_word_null_result<T: AsRef<str>>(&mut self, stop_word: T) -> &mut Self {
+            pub fn set_stop_word_no_result<T: AsRef<str>>(&mut self, stop_word: T) -> &mut Self {
                 match self {
                     $(
                         $enum_name::$variant(grammar) => {
-                           if grammar.stop_word_null_result.as_deref() != Some(stop_word.as_ref()) {
-                               grammar.stop_word_null_result = Some(stop_word.as_ref().to_owned());
+                           if grammar.stop_word_no_result.as_deref() != Some(stop_word.as_ref()) {
+                               grammar.stop_word_no_result = Some(stop_word.as_ref().to_owned());
                             }
                             self
                         }
@@ -107,7 +107,7 @@ impl Default for Grammar {
 pub trait GrammarSetterTrait {
     fn stop_word_done_mut(&mut self) -> &mut Option<String>;
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String>;
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String>;
 
     fn set_stop_word_done<T: AsRef<str>>(&mut self, stop_word: T) -> &mut Self
     where
@@ -119,12 +119,12 @@ pub trait GrammarSetterTrait {
         self
     }
 
-    fn set_stop_word_null_result<T: AsRef<str>>(&mut self, stop_word: T) -> &mut Self
+    fn set_stop_word_no_result<T: AsRef<str>>(&mut self, stop_word: T) -> &mut Self
     where
         Self: Sized,
     {
-        if self.stop_word_null_result_mut().as_deref() != Some(stop_word.as_ref()) {
-            *self.stop_word_null_result_mut() = Some(stop_word.as_ref().to_owned());
+        if self.stop_word_no_result_mut().as_deref() != Some(stop_word.as_ref()) {
+            *self.stop_word_no_result_mut() = Some(stop_word.as_ref().to_owned());
         }
         self
     }
@@ -160,7 +160,7 @@ mod tests {
         let mut grammar = Grammar::boolean();
         assert!(grammar
             .set_stop_word_done("done")
-            .set_stop_word_null_result("nah")
+            .set_stop_word_no_result("nah")
             .grammar_string()
             .contains("done"));
 

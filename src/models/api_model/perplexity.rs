@@ -1,67 +1,76 @@
-use super::{ApiLlm, ApiLlmType};
-use crate::tokenizer::LlmTokenizer;
+use crate::{
+    models::{api_model::ApiLlmModel, LlmModelBase},
+    tokenizer::LlmTokenizer,
+};
 use std::sync::Arc;
 
-impl ApiLlm {
-    pub fn perplexity_model_from_model_id(model_id: &str) -> ApiLlm {
-        if model_id.starts_with("claude-3-opus") {
-            Self::claude_3_opus()
-        } else if model_id.starts_with("claude-3-sonnet") {
-            Self::claude_3_sonnet()
-        } else if model_id.starts_with("claude-3-haiku") {
-            Self::claude_3_haiku()
-        } else if model_id.starts_with("claude-3.5-sonnet") {
-            Self::claude_3_5_sonnet()
+impl ApiLlmModel {
+    pub fn perplexity_model_from_model_id(model_id: &str) -> ApiLlmModel {
+        if model_id.starts_with("llama-3.1-sonar-small") {
+            Self::sonar_small()
+        } else if model_id.starts_with("llama-3.1-sonar-large") {
+            Self::sonar_large()
+        } else if model_id.starts_with("llama-3.1-sonar-huge") {
+            Self::sonar_huge()
+        } else if model_id.contains("sonar-small") {
+            Self::sonar_small()
+        } else if model_id.contains("sonar-large") {
+            Self::sonar_large()
+        } else if model_id.contains("sonar-huge") {
+            Self::sonar_huge()
         } else {
-            panic!("Model ID ({model_id}) not found for ApiLlm")
+            panic!("Model ID ({model_id}) not found for ApiLlmModel")
         }
     }
 
-    pub fn sonar_small() -> ApiLlm {
+    pub fn sonar_small() -> ApiLlmModel {
         let model_id = "llama-3.1-sonar-small-128k-online".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 127072,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 127072,
+                max_tokens_output: 8192,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 0.1,
-            max_tokens_output: 8192,
             cost_per_m_out_tokens: 0.1,
             tokens_per_message: 3,
             tokens_per_name: None,
-            tokenizer,
-            api_type: ApiLlmType::Anthropic,
         }
     }
 
-    pub fn sonar_large() -> ApiLlm {
+    pub fn sonar_large() -> ApiLlmModel {
         let model_id = "llama-3.1-sonar-large-128k-online".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 127072,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 127072,
+                max_tokens_output: 8192,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 0.5,
-            max_tokens_output: 8192,
             cost_per_m_out_tokens: 0.5,
             tokens_per_message: 3,
             tokens_per_name: None,
-            tokenizer,
-            api_type: ApiLlmType::Anthropic,
         }
     }
 
-    pub fn sonar_huge() -> ApiLlm {
+    pub fn sonar_huge() -> ApiLlmModel {
         let model_id = "llama-3.1-sonar-huge-128k-online".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 127072,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 127072,
+                max_tokens_output: 8192,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 2.5,
-            max_tokens_output: 8192,
             cost_per_m_out_tokens: 2.5,
             tokens_per_message: 3,
             tokens_per_name: None,
-            tokenizer,
-            api_type: ApiLlmType::Anthropic,
         }
     }
 }
@@ -74,14 +83,14 @@ pub fn model_tokenizer(_model_id: &str) -> Arc<LlmTokenizer> {
 }
 
 pub trait PerplexityModelTrait: Sized {
-    fn model(&mut self) -> &mut Option<ApiLlm>;
+    fn model(&mut self) -> &mut Option<ApiLlmModel>;
 
     /// Set the model using the model_id string.
     fn model_id_str(mut self, model_id: &str) -> Self
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::anthropic_model_from_model_id(model_id));
+        *self.model() = Some(ApiLlmModel::perplexity_model_from_model_id(model_id));
         self
     }
 
@@ -89,7 +98,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::sonar_small());
+        *self.model() = Some(ApiLlmModel::sonar_small());
         self
     }
 
@@ -97,7 +106,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::sonar_large());
+        *self.model() = Some(ApiLlmModel::sonar_large());
         self
     }
 
@@ -105,7 +114,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::sonar_huge());
+        *self.model() = Some(ApiLlmModel::sonar_huge());
         self
     }
 }

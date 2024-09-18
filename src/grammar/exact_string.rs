@@ -5,7 +5,7 @@ use std::cell::RefCell;
 pub struct ExactStringGrammar {
     pub exact_strings: Vec<String>,
     pub stop_word_done: Option<String>,
-    pub stop_word_null_result: Option<String>,
+    pub stop_word_no_result: Option<String>,
     grammar_string: RefCell<Option<String>>,
 }
 
@@ -42,7 +42,7 @@ impl ExactStringGrammar {
             *grammar_string = Some(exact_string_grammar(
                 &self.exact_strings,
                 &self.stop_word_done,
-                &self.stop_word_null_result,
+                &self.stop_word_no_result,
             ));
         }
         grammar_string.as_ref().unwrap().clone()
@@ -62,15 +62,15 @@ impl GrammarSetterTrait for ExactStringGrammar {
         &mut self.stop_word_done
     }
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String> {
-        &mut self.stop_word_null_result
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String> {
+        &mut self.stop_word_no_result
     }
 }
 
 pub fn exact_string_grammar<T: AsRef<str>>(
     exact_strings: &[String],
     stop_word_done: &Option<T>,
-    stop_word_null_result: &Option<T>,
+    stop_word_no_result: &Option<T>,
 ) -> String {
     let mut pattern = String::new();
     for text in exact_strings {
@@ -82,16 +82,16 @@ pub fn exact_string_grammar<T: AsRef<str>>(
         pattern.push_str(&format!(" \"{}\" ", text));
     }
     pattern.push(')');
-    match (stop_word_done, stop_word_null_result) {
-        (Some(stop_word_done), Some(stop_word_null_result)) => format!(
+    match (stop_word_done, stop_word_no_result) {
+        (Some(stop_word_done), Some(stop_word_no_result)) => format!(
             "root ::= \" \" ( {pattern} | \"{}\" ) \" {}\"",
-            stop_word_null_result.as_ref(),
+            stop_word_no_result.as_ref(),
             stop_word_done.as_ref()
         ),
-        (None, Some(stop_word_null_result)) => {
+        (None, Some(stop_word_no_result)) => {
             format!(
                 "root ::= \" \" ( {pattern} | \"{}\" )",
-                stop_word_null_result.as_ref()
+                stop_word_no_result.as_ref()
             )
         }
         (Some(stop_word_done), None) => {

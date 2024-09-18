@@ -8,7 +8,7 @@ pub struct SentencesGrammar {
     pub sentence_token_length: u32,
     pub capitalize_first: bool,
     pub stop_word_done: Option<String>,
-    pub stop_word_null_result: Option<String>,
+    pub stop_word_no_result: Option<String>,
     pub concatenator: String,
     grammar_string: RefCell<Option<String>>,
 }
@@ -21,7 +21,7 @@ impl Default for SentencesGrammar {
             sentence_token_length: 50,
             capitalize_first: true,
             stop_word_done: None,
-            stop_word_null_result: None,
+            stop_word_no_result: None,
             concatenator: " ".to_string(),
             grammar_string: RefCell::new(None),
         }
@@ -63,7 +63,7 @@ impl SentencesGrammar {
                 self.capitalize_first,
                 &self.concatenator,
                 &self.stop_word_done,
-                &self.stop_word_null_result,
+                &self.stop_word_no_result,
             ));
         }
         grammar_string.as_ref().unwrap().clone()
@@ -83,8 +83,8 @@ impl GrammarSetterTrait for SentencesGrammar {
         &mut self.stop_word_done
     }
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String> {
-        &mut self.stop_word_null_result
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String> {
+        &mut self.stop_word_no_result
     }
 }
 
@@ -97,7 +97,7 @@ pub fn sentences_grammar<T: AsRef<str>>(
     capitalize_first: bool,
     concatenator: &str,
     stop_word_done: &Option<T>,
-    stop_word_null_result: &Option<T>,
+    stop_word_no_result: &Option<T>,
 ) -> String {
     let sentence_item = if capitalize_first {
         format!(
@@ -112,16 +112,16 @@ pub fn sentences_grammar<T: AsRef<str>>(
     };
     let range = create_range(min_count, max_count, stop_word_done);
     let item = format!("item ::= {sentence_item} \"{concatenator}\"",);
-    match (stop_word_done, stop_word_null_result) {
-        (Some(stop_word_done), Some(stop_word_null_result)) => format!(
+    match (stop_word_done, stop_word_no_result) {
+        (Some(stop_word_done), Some(stop_word_no_result)) => format!(
             "root ::= \" \" ( {range} | \"{}\" ) \" {}\"\n{item}",
-            stop_word_null_result.as_ref(),
+            stop_word_no_result.as_ref(),
             stop_word_done.as_ref()
         ),
-        (None, Some(stop_word_null_result)) => {
+        (None, Some(stop_word_no_result)) => {
             format!(
                 "root ::= \" \" ( {range} | \"{}\" )\n{item}",
-                stop_word_null_result.as_ref()
+                stop_word_no_result.as_ref()
             )
         }
         (Some(stop_word_done), None) => {

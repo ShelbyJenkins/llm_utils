@@ -8,7 +8,7 @@ pub struct FauxUrlGrammar {
     pub word_char_length: u8,
     pub base_url: String,
     pub stop_word_done: Option<String>,
-    pub stop_word_null_result: Option<String>,
+    pub stop_word_no_result: Option<String>,
     grammar_string: RefCell<Option<String>>,
 }
 
@@ -20,7 +20,7 @@ impl Default for FauxUrlGrammar {
             word_char_length: 12,
             base_url: "https://example.com/".to_string(),
             stop_word_done: None,
-            stop_word_null_result: None,
+            stop_word_no_result: None,
             grammar_string: RefCell::new(None),
         }
     }
@@ -60,7 +60,7 @@ impl FauxUrlGrammar {
                 self.word_char_length,
                 &self.base_url,
                 &self.stop_word_done,
-                &self.stop_word_null_result,
+                &self.stop_word_no_result,
             ));
         }
         grammar_string.as_ref().unwrap().clone()
@@ -80,8 +80,8 @@ impl GrammarSetterTrait for FauxUrlGrammar {
         &mut self.stop_word_done
     }
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String> {
-        &mut self.stop_word_null_result
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String> {
+        &mut self.stop_word_no_result
     }
 }
 
@@ -91,21 +91,21 @@ pub fn faux_url_grammar<T: AsRef<str>>(
     word_char_length: u8,
     base_url: &str,
     stop_word_done: &Option<T>,
-    stop_word_null_result: &Option<T>,
+    stop_word_no_result: &Option<T>,
 ) -> String {
     let range = create_range(min_count, max_count, stop_word_done);
     let first = format!("first ::= [a-z]{{3,{word_char_length}}}");
     let item = format!("item ::= \"-\" [a-z]{{3,{word_char_length}}}");
-    match (stop_word_done, stop_word_null_result) {
-        (Some(stop_word_done), Some(stop_word_null_result)) => format!(
+    match (stop_word_done, stop_word_no_result) {
+        (Some(stop_word_done), Some(stop_word_no_result)) => format!(
             "root ::= \" \" ( \"{base_url}\" {range} | \"{}\" ) \" {}\"\n{item}\n{first}",
-            stop_word_null_result.as_ref(),
+            stop_word_no_result.as_ref(),
             stop_word_done.as_ref()
         ),
-        (None, Some(stop_word_null_result)) => {
+        (None, Some(stop_word_no_result)) => {
             format!(
                 "root ::= \" \" ( \"{base_url}\" {range} | \"{}\" )\n{item}\n{first}",
-                stop_word_null_result.as_ref()
+                stop_word_no_result.as_ref()
             )
         }
         (Some(stop_word_done), None) => {

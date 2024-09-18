@@ -1,9 +1,11 @@
-use super::{ApiLlm, ApiLlmType};
-use crate::tokenizer::LlmTokenizer;
+use crate::{
+    models::{api_model::ApiLlmModel, LlmModelBase},
+    tokenizer::LlmTokenizer,
+};
 use std::sync::Arc;
 
-impl ApiLlm {
-    pub fn openai_model_from_model_id(model_id: &str) -> ApiLlm {
+impl ApiLlmModel {
+    pub fn openai_model_from_model_id(model_id: &str) -> ApiLlmModel {
         match model_id {
             "gpt-4" => Self::gpt_4(),
             "gpt-4-32k" => Self::gpt_4_32k(),
@@ -11,103 +13,143 @@ impl ApiLlm {
             "gpt-4o" => Self::gpt_4_o(),
             "gpt-3.5-turbo" => Self::gpt_3_5_turbo(),
             "gpt-4o-mini" => Self::gpt_3_5_turbo(),
-            _ => panic!("Model ID ({model_id}) not found for ApiLlm"),
+            _ => panic!("Model ID ({model_id}) not found for ApiLlmModel"),
         }
     }
 
-    pub fn gpt_4() -> ApiLlm {
+    pub fn gpt_4() -> ApiLlmModel {
         let model_id = "gpt-4".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 8192,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 8192,
+                max_tokens_output: 4096,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 30.00,
-            max_tokens_output: 4096,
             cost_per_m_out_tokens: 60.00,
             tokens_per_message: 3,
             tokens_per_name: Some(1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
         }
     }
 
-    pub fn gpt_4_32k() -> ApiLlm {
+    pub fn gpt_4_32k() -> ApiLlmModel {
         let model_id = "gpt-4-32k".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 32768,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 32768,
+                max_tokens_output: 4096,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 60.00,
-            max_tokens_output: 4096,
             cost_per_m_out_tokens: 120.00,
             tokens_per_message: 3,
             tokens_per_name: Some(1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
         }
     }
 
-    pub fn gpt_4_turbo() -> ApiLlm {
+    pub fn gpt_4_turbo() -> ApiLlmModel {
         let model_id = "gpt-4-turbo".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 128000,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 128000,
+                max_tokens_output: 4096,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 10.00,
-            max_tokens_output: 4096,
             cost_per_m_out_tokens: 30.00,
             tokens_per_message: 3,
             tokens_per_name: Some(1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
         }
     }
 
-    pub fn gpt_4_o() -> ApiLlm {
-        let model_id = "gpt-4o".to_string();
-        let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 128000,
-            cost_per_m_in_tokens: 5.00,
-            max_tokens_output: 4096,
-            cost_per_m_out_tokens: 15.00,
-            tokens_per_message: 3,
-            tokens_per_name: Some(1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
-        }
-    }
-
-    pub fn gpt_3_5_turbo() -> ApiLlm {
+    pub fn gpt_3_5_turbo() -> ApiLlmModel {
         let model_id = "gpt-3.5-turbo".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 16385,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 16385,
+                max_tokens_output: 4096,
+                tokenizer,
+            },
             cost_per_m_in_tokens: 0.50,
-            max_tokens_output: 4096,
             cost_per_m_out_tokens: 1.50,
             tokens_per_message: 4,
             tokens_per_name: Some(-1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
         }
     }
 
-    pub fn gpt_4_o_mini() -> ApiLlm {
+    pub fn gpt_4_o_mini() -> ApiLlmModel {
         let model_id = "gpt-4o-mini".to_string();
         let tokenizer = model_tokenizer(&model_id);
-        ApiLlm {
-            model_id,
-            context_length: 128000,
-            cost_per_m_in_tokens: 0.15,
-            max_tokens_output: 16384,
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 128000,
+                max_tokens_output: 16384,
+                tokenizer,
+            },
+            cost_per_m_in_tokens: 0.150,
             cost_per_m_out_tokens: 0.60,
             tokens_per_message: 3,
             tokens_per_name: Some(1),
-            tokenizer,
-            api_type: ApiLlmType::OpenAi,
+        }
+    }
+
+    pub fn gpt_4_o() -> ApiLlmModel {
+        let model_id = "gpt-4o".to_string();
+        let tokenizer = model_tokenizer(&model_id);
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 128000,
+                max_tokens_output: 4096,
+                tokenizer,
+            },
+            cost_per_m_in_tokens: 5.00,
+            cost_per_m_out_tokens: 15.00,
+            tokens_per_message: 3,
+            tokens_per_name: Some(1),
+        }
+    }
+
+    pub fn o1_mini() -> ApiLlmModel {
+        let model_id = "o1-mini".to_string();
+        let tokenizer = model_tokenizer("gpt-4o-mini");
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 128000,
+                max_tokens_output: 65536,
+                tokenizer,
+            },
+            cost_per_m_in_tokens: 3.00,
+            cost_per_m_out_tokens: 12.00,
+            tokens_per_message: 4,
+            tokens_per_name: Some(-1),
+        }
+    }
+
+    pub fn o1_preview() -> ApiLlmModel {
+        let model_id = "o1-preview".to_string();
+        let tokenizer = model_tokenizer("gpt-4o-mini");
+        ApiLlmModel {
+            model_base: LlmModelBase {
+                model_id,
+                context_length: 128000,
+                max_tokens_output: 32768,
+                tokenizer,
+            },
+            cost_per_m_in_tokens: 15.00,
+            cost_per_m_out_tokens: 60.00,
+            tokens_per_message: 4,
+            tokens_per_name: Some(-1),
         }
     }
 }
@@ -119,15 +161,15 @@ fn model_tokenizer(model_id: &str) -> Arc<LlmTokenizer> {
     )
 }
 
-pub trait OpenAiModelTrait: Sized {
-    fn model(&mut self) -> &mut Option<ApiLlm>;
+pub trait OpenAiModelTrait {
+    fn model(&mut self) -> &mut ApiLlmModel;
 
     /// Set the model using the model_id string.
     fn model_id_str(mut self, model_id: &str) -> Self
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::openai_model_from_model_id(model_id));
+        *self.model() = ApiLlmModel::openai_model_from_model_id(model_id);
         self
     }
 
@@ -136,7 +178,7 @@ pub trait OpenAiModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::gpt_4());
+        *self.model() = ApiLlmModel::gpt_4();
         self
     }
 
@@ -145,7 +187,7 @@ pub trait OpenAiModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::gpt_4_32k());
+        *self.model() = ApiLlmModel::gpt_4_32k();
         self
     }
 
@@ -154,7 +196,7 @@ pub trait OpenAiModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::gpt_4_turbo());
+        *self.model() = ApiLlmModel::gpt_4_turbo();
         self
     }
 
@@ -163,7 +205,7 @@ pub trait OpenAiModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::gpt_4_o());
+        *self.model() = ApiLlmModel::gpt_4_o();
         self
     }
 
@@ -172,7 +214,15 @@ pub trait OpenAiModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlm::gpt_3_5_turbo());
+        *self.model() = ApiLlmModel::gpt_3_5_turbo();
+        self
+    }
+
+    fn o1_preview<T: Into<Option<bool>>>(mut self) -> Self
+    where
+        Self: Sized,
+    {
+        *self.model() = ApiLlmModel::gpt_3_5_turbo();
         self
     }
 }

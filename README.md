@@ -5,14 +5,14 @@
 For real world examples of how this crate is used, check out the [llm_client crate](https://github.com/ShelbyJenkins/llm_client).
 
 ### Model Loading
-* `models::open_source_model::OsLlm`
-    * `models::open_source_model::preset::LlmPresetLoader`
+* `models::local_model::LocalLlmModel`
+    * `models::local_model::preset::LlmPresetLoader`
         * Presets for popular models that includes HF repos for the models, and local copies of tokenizers and chat templates
         * Loads the best quantized model by calculating the largest quant that will fit in your VRAM
         * Supports Llama 3, Phi, Mistral/Mixtral, and more
-    * `models::open_source_model::LlmGgufLoader`
+    * `models::local_model::GgufLoader`
         * Loads any GGUF model from HF repo or locally
-* `models::api_model::ApiLlm`
+* `models::api_model::ApiLlmModel`
     * Supports openai, anthropic, perplexity
     * Supports prompting, tokenization, and price estimation
 
@@ -20,21 +20,14 @@ For real world examples of how this crate is used, check out the [llm_client cra
 * `tokenizer::LlmTokenizer`
     * A simple abstraction over HF's tokenizers and tiktoken-rs
     * Load from local or HF.
-    * Included in `OsLlm` and `ApiLlm`
+    * Included in `LocalLlmModel` and `ApiLlmModel`
 * `prompting::LlmPrompt`
     * Build System/User/Assitant prompt messages into formatted prompts
     * Supports chat template strings/tokens and openai hashmaps
     * Count prompt tokens
-    * Integrated with `OsLlm` and `ApiLlm`
+    * Integrated with `LocalLlmModel` and `ApiLlmModel`
     * Assemble messages from multiple text inputs
     * Build with generation prefixes on all chat template models. Even those that don't explicitly support it.
-
-### Constraints
-* `grammar::Grammar`
-    * Pre-built configurable grammars for fine grained control of open source LLM outputs
-    * Currently supports Llama.cpp style grammars, but intended to scale to support other grammars in the future.
-* `logit_bias`
-    * Supports all LLMs that can use logit bias constraints
 
 ### Text Processing and NLP 
 * `text_utils::chunking::TextChunker`
@@ -55,9 +48,15 @@ For real world examples of how this crate is used, check out the [llm_client cra
     * Macro generated test content
     * Used for internal testing, but can be used for general LLM test cases
 
+### Constraints
+* grammar::Grammar
+    * Pre-built configurable grammars for fine grained control of open source LLM outputs
+    * Currently supports Llama.cpp style grammars, but intended to scale to support other grammars in the future.
+
+
 ### Setter Traits
 * All setter traits are public, so you can integrate into your own projects if you wish. 
-* For example: `models::api_model_openai::OpenAiModelTrait` or `models::open_source_model::hf_loader::HfTokenTrait`
+* For example: `models::api_model::openai::OpenAiModelTrait` or `models::local_model::hf_loader::HfTokenTrait`
 
 ## Installation
 
@@ -76,9 +75,8 @@ llm_utils = "*"
 
 
 ```rust
-    // Load the largest quantized Meta-Llama-3-8B-Instruct model that will fit in your vram
-    let model: OsLlm = OsLlmLoader::new()
-        .llama3_8b_instruct()
+    // Load the largest quantized Meta-Llama-3.1-8B-Instruct model that will fit in your vram
+    let model: OsLlm = GgufLoader::default().llama3_1_8b_instruct()
         .vram(48)
         .use_ctx_size(9001) // ctx_size impacts vram usage!
         .load()?;
@@ -87,48 +85,48 @@ llm_utils = "*"
 
 See [example.](examples/model_presets.rs)
 
-### LlmGgufLoader
+### GgufLoader
 
 * GGUF models from Hugging Face or local path 
 
 ```rust
     // From HF
     let model_url = "https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q6_K.gguf";
-    let model: OsLlm = LlmGgufLoader::new()
+    let model: OsLlm = GgufLoader::default()
         .hf_quant_file_url(model_url)
         .load()?;
 
     // Note: because we can't instantiate a tokenizer from a GGUF file, the returned model will not have a tokenizer!
     // However, if we provide the base model's repo, we load from there.
     let repo_id = "meta-llama/Meta-Llama-3-8B-Instruct";
-    let model: OsLlm = LlmGgufLoader::new()
+    let model: OsLlm = GgufLoader::default()
         .hf_quant_file_url(model_url)
         .hf_config_repo_id(repo_id)
         .load()?;
 
     // From Local
     let local_path = "/root/.cache/huggingface/hub/models--MaziyarPanahi--Meta-Llama-3-8B-Instruct-GGUF/blobs/c2ca99d853de276fb25a13e369a0db2fd3782eff8d28973404ffa5ffca0b9267";
-    let model: OsLlm = LlmGgufLoader::new()
+    let model: OsLlm = GgufLoader::default()
         .local_quant_file_path(local_path)
         .load()?;
 
     // Again, we require a tokenizer.json. This can also be loaded from a local path.
     let local_config_path = "/llm_utils/src/models/open_source/llama/llama3_8b_instruct";
-    let model: OsLlm = LlmGgufLoader::new()
+    let model: OsLlm = GgufLoader::default()
         .local_quant_file_path(model_url)
         .local_config_path(local_config_path)
         .load()?;
 ```
 
-See [tests for more examples.](src/models/open_source_model/gguf.rs#L150)
+See [tests for more examples.](src/models/local_model/gguf.rs#L150)
 
-### ApiLlm
+### ApiLlmModel
 
 ```rust
 
-    let model: ApiLlm = ApiLlm::gpt_4_o();
+    let model: ApiLlmModel = ApiLlmModel::gpt_4_o();
 
-    assert_eq!(model, ApiLlm {
+    assert_eq!(model, ApiLlmModel {
         model_id: "gpt-4o".to_string(),
         context_length: 128000,
         cost_per_m_in_tokens: 5.00,
@@ -141,7 +139,7 @@ See [tests for more examples.](src/models/open_source_model/gguf.rs#L150)
 
     // Or Anthropic
     //
-    let model: ApiLlm = ApiLlm::claude_3_opus();
+    let model: ApiLlmModel = ApiLlmModel::claude_3_opus();
 ```
 
 
@@ -157,7 +155,7 @@ See [tests for more examples.](src/models/open_source_model/gguf.rs#L150)
     let model: OsLlm = OsLlmLoader::new().llama3_8b_instruct().load()?;
     let prompt: LlmPrompt = LlmPrompt::new_from_os_llm(&model);
     // or
-    let model: ApiLlm = ApiLlm::gpt_4_o();
+    let model: ApiLlmModel = ApiLlmModel::gpt_4_o();
     let prompt: LlmPrompt = LlmPrompt::new_from_openai_llm(&model);
 
     // Add system messages
@@ -181,11 +179,11 @@ See [tests for more examples.](src/models/open_source_model/gguf.rs#L150)
     prompt.build_final();
 
     // Chat template formatted
-    let chat_template_prompt: String = prompt.built_chat_template_prompt.clone()
+    let chat_template_prompt: String = prompt.built_prompt_string.clone()
     let chat_template_prompt_as_tokens: Vec<u32> = prompt.built_prompt_as_tokens.clone()
 
     // Openai formatted prompt (Openai and Anthropic format)
-    let openai_prompt: Vec<HashMap<String, String>> = prompt.built_openai_prompt.clone()
+    let openai_prompt: Vec<HashMap<String, String>> = prompt.built_prompt_hashmap.clone()
 
     // Get total tokens in prompt
     let total_prompt_tokens: u32 = prompt.total_prompt_tokens();
@@ -340,7 +338,7 @@ The TextChunker first attempts to split semantically in the following order: Par
     // Sets a stop word to be appended to the end of generation
     integer_grammar.set_stop_word_done("Done.");
     // Sets the primitive as optional; a stop word can be generated rather than the primitive
-    integer_grammar.set_stop_word_null_result("None.");
+    integer_grammar.set_stop_word_no_result("None.");
 
     // Returns the string to feed into LLM call
     let grammar_string: String = integer_grammar.grammar_string();
@@ -360,28 +358,6 @@ The TextChunker first attempts to split semantically in the following order: Par
 ```
 
 See [the module for all implemented types](src/grammar/mod.rs#L21)
-
-### Logit bias 
-- Create properly formatted logit bias requests for LlamaCpp and Openai.
-
-- Functionality to add logit bias from a variety of sources, along with validation.
-```rust
-    // Exclude some tokens from text generation
-    //
-    let mut words = HashMap::new();
-    words.entry("delve").or_insert(-100.0);
-    words.entry("as an ai model").or_insert(-100.0);
-
-    // Build and validate
-    //
-    let logit_bias = logit_bias::logit_bias_from_words(&tokenizer, &words)
-    let validated_logit_bias = logit_bias::validate_logit_bias_values(&logit_bias)?;
-
-    // Convert
-    //
-    let openai_logit_bias = logit_bias::convert_logit_bias_to_openai_format(&validated_logit_bias)?;
-    let llama_logit_bias = logit_bias::convert_logit_bias_to_llama_format(&validated_logit_bias)?;
-```
 
 
 

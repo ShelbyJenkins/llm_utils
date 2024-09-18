@@ -4,7 +4,7 @@ use std::cell::RefCell;
 #[derive(Clone, Default)]
 pub struct IntegerGrammar {
     pub stop_word_done: Option<String>,
-    pub stop_word_null_result: Option<String>,
+    pub stop_word_no_result: Option<String>,
     pub lower_bound: u32,
     pub upper_bound: u32,
     grammar_string: RefCell<Option<String>>,
@@ -14,7 +14,7 @@ impl IntegerGrammar {
     pub fn new() -> Self {
         Self {
             stop_word_done: None,
-            stop_word_null_result: None,
+            stop_word_no_result: None,
             lower_bound: 1,
             upper_bound: 9,
             grammar_string: RefCell::new(None),
@@ -44,7 +44,7 @@ impl IntegerGrammar {
                 self.lower_bound,
                 self.upper_bound,
                 &self.stop_word_done,
-                &self.stop_word_null_result,
+                &self.stop_word_no_result,
             ));
         }
         grammar_string.as_ref().unwrap().clone()
@@ -64,8 +64,8 @@ impl GrammarSetterTrait for IntegerGrammar {
         &mut self.stop_word_done
     }
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String> {
-        &mut self.stop_word_null_result
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String> {
+        &mut self.stop_word_no_result
     }
 }
 
@@ -73,7 +73,7 @@ pub fn integer_grammar<T: AsRef<str>>(
     lower_bound: u32,
     upper_bound: u32,
     stop_word_done: &Option<T>,
-    stop_word_null_result: &Option<T>,
+    stop_word_no_result: &Option<T>,
 ) -> String {
     match upper_bound.cmp(&lower_bound) {
         std::cmp::Ordering::Less => {
@@ -84,16 +84,16 @@ pub fn integer_grammar<T: AsRef<str>>(
     }
     // let mut base = "root ::= \" \" ".to_string();
     let range = create_range(lower_bound, upper_bound, stop_word_done);
-    match (stop_word_done, stop_word_null_result) {
-        (Some(stop_word_done), Some(stop_word_null_result)) => format!(
+    match (stop_word_done, stop_word_no_result) {
+        (Some(stop_word_done), Some(stop_word_no_result)) => format!(
             "root ::= \" \" ( {range} | \"{}\" ) \" {}\"",
-            stop_word_null_result.as_ref(),
+            stop_word_no_result.as_ref(),
             stop_word_done.as_ref()
         ),
-        (None, Some(stop_word_null_result)) => {
+        (None, Some(stop_word_no_result)) => {
             format!(
                 "root ::= \" \" ( {range} | \"{}\" )",
-                stop_word_null_result.as_ref()
+                stop_word_no_result.as_ref()
             )
         }
         (Some(stop_word_done), None) => {
@@ -186,7 +186,7 @@ mod tests {
 
         let grammar_string = grammar
             .set_stop_word_done("stop")
-            .set_stop_word_null_result("unknown")
+            .set_stop_word_no_result("unknown")
             .grammar_string();
 
         assert_eq!(

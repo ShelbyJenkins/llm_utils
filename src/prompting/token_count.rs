@@ -1,7 +1,35 @@
-use super::*;
+use crate::tokenizer::LlmTokenizer;
 use thiserror::Error;
 
 pub const DEFAULT_SAFETY_TOKENS: u32 = 10;
+
+pub fn total_prompt_tokens_openai_format(
+    prompt: &Vec<std::collections::HashMap<String, String>>,
+    tokens_per_message: u32,
+    tokens_per_name: Option<i32>,
+    tokenizer: &std::sync::Arc<LlmTokenizer>,
+) -> u32 {
+    let mut num_tokens = 0;
+    for message in prompt {
+        num_tokens += tokens_per_message;
+
+        for (key, value) in message.iter() {
+            num_tokens += tokenizer.count_tokens(value);
+            if let Some(tokens_per_name) = tokens_per_name {
+                if key == "name" {
+                    if tokens_per_name < 0 {
+                        // Handles cases for certain models where name doesn't count towards token count
+                        num_tokens -= tokens_per_name.unsigned_abs();
+                    } else {
+                        num_tokens += tokens_per_name as u32;
+                    }
+                }
+            }
+        }
+    }
+    num_tokens += 3; // every reply is primed with <|start|>assistant<|message|>
+    num_tokens
+}
 
 /// Sets and validates the 'max_tokens' or 'n_ctx' or 'n_predict' parameter for a request.
 /// First, it checks that the total_prompt_tokens is less than the ctx_size - safety_tokens.
@@ -86,14 +114,30 @@ pub fn available_tokens(
     Ok(available_tokens - safety_tokens)
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, Clone)]
+pub struct TokenState {
+    pub actual_request: u32,
+    pub requested_response: u32,
+}
+
+#[derive(Error, Debug, Clone)]
 pub enum RequestTokenLimitError {
     #[error("total_prompt_tokens ({total_prompt_tokens}) exceeds ctx_size ({ctx_size})")]
     PromptTokensExceeds {
         total_prompt_tokens: u32,
         ctx_size: u32,
     },
-
     #[error("GenericPromptError: {e}")]
     GenericPromptError { e: String },
+    #[error("PromptTokensNotSet: Prompt tokens not set.")]
+    PromptTokensNotSet,
+    #[error(
+        "TokenLimitIncreaseError: initial_state: {:?}, new_state: {:?}",
+        initial_state,
+        new_state
+    )]
+    TokenLimitIncreaseError {
+        initial_state: TokenState,
+        new_state: TokenState,
+    },
 }

@@ -5,7 +5,7 @@ use std::cell::RefCell;
 pub struct TextGrammar {
     pub item_token_length: u32,
     pub stop_word_done: Option<String>,
-    pub stop_word_null_result: Option<String>,
+    pub stop_word_no_result: Option<String>,
     grammar_string: RefCell<Option<String>>,
 }
 
@@ -14,7 +14,7 @@ impl Default for TextGrammar {
         Self {
             item_token_length: 200,
             stop_word_done: None,
-            stop_word_null_result: None,
+            stop_word_no_result: None,
             grammar_string: RefCell::new(None),
         }
     }
@@ -36,7 +36,7 @@ impl TextGrammar {
             *grammar_string = Some(text_grammar(
                 self.item_token_length,
                 &self.stop_word_done,
-                &self.stop_word_null_result,
+                &self.stop_word_no_result,
             ));
         }
         grammar_string.as_ref().unwrap().clone()
@@ -56,8 +56,8 @@ impl GrammarSetterTrait for TextGrammar {
         &mut self.stop_word_done
     }
 
-    fn stop_word_null_result_mut(&mut self) -> &mut Option<String> {
-        &mut self.stop_word_null_result
+    fn stop_word_no_result_mut(&mut self) -> &mut Option<String> {
+        &mut self.stop_word_no_result
     }
 }
 
@@ -66,12 +66,12 @@ const CHAR_NO_NEWLINE: &str = r"[^\r\x0b\x0c\x85\u2028\u2029]";
 pub fn text_grammar(
     item_token_length: u32,
     stop_word_done: &Option<String>,
-    stop_word_null_result: &Option<String>,
+    stop_word_no_result: &Option<String>,
 ) -> String {
-    match (stop_word_done, stop_word_null_result) {
-        (Some(stop_word_done), Some(stop_word_null_result)) => {
+    match (stop_word_done, stop_word_no_result) {
+        (Some(stop_word_done), Some(stop_word_no_result)) => {
             format!(
-                "root ::= \" \" ( item{{1,{}}} | \"{stop_word_null_result}\" ) \" {stop_word_done}\"\nitem ::= {CHAR_NO_NEWLINE}",
+                "root ::= \" \" ( item{{1,{}}} | \"{stop_word_no_result}\" ) \" {stop_word_done}\"\nitem ::= {CHAR_NO_NEWLINE}",
                 (item_token_length as f32 * 4.5).floor() as u32
             )
         }
@@ -81,9 +81,9 @@ pub fn text_grammar(
                 (item_token_length as f32 * 4.5).floor() as u32
             )
         }
-        (None, Some(stop_word_null_result)) => {
+        (None, Some(stop_word_no_result)) => {
             format!(
-                "root ::= \" \" ( item{{1,{}}} | \"{stop_word_null_result}\" )\nitem ::= {CHAR_NO_NEWLINE}",
+                "root ::= \" \" ( item{{1,{}}} | \"{stop_word_no_result}\" )\nitem ::= {CHAR_NO_NEWLINE}",
                 (item_token_length as f32 * 4.5).floor() as u32
             )
         }

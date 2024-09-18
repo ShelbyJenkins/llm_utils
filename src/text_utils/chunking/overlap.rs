@@ -216,7 +216,7 @@ impl OverlapChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::open_source_model::preset::LlmPreset, text_utils::test_text};
+    use crate::{models::local_model::preset::LlmPreset, text_utils::test_text};
     #[test]
     fn test_overlap() {
         let test_cases = [
@@ -240,7 +240,11 @@ mod tests {
             assert_eq!(chunk, test_cases[i]);
         }
 
-        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
+        let tokenizer = LlmPreset::Llama3_1_8bInstruct
+            .load()
+            .unwrap()
+            .model_base
+            .tokenizer;
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)
@@ -266,7 +270,11 @@ mod tests {
             .unwrap();
         assert!(res.token_counts().iter().all(|&x| x <= absolute_length_max));
 
-        let tokenizer: Arc<LlmTokenizer> = LlmPreset::Llama3_8bInstruct.tokenizer().unwrap();
+        let tokenizer = LlmPreset::Llama3_1_8bInstruct
+            .load()
+            .unwrap()
+            .model_base
+            .tokenizer;
         let mut res = TextChunker::new_with_tokenizer(&tokenizer)
             .max_chunk_token_size(absolute_length_max)
             .overlap_percent(0.166666)

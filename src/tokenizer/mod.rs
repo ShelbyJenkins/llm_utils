@@ -1,4 +1,4 @@
-use crate::models::open_source_model::hf_loader::{HfTokenTrait, HuggingFaceLoader};
+use crate::models::local_model::hf_loader::{HfTokenTrait, HuggingFaceLoader};
 use anyhow::{anyhow, Result};
 use std::{fmt, path::PathBuf};
 use tiktoken_rs::{get_bpe_from_model, CoreBPE};
@@ -36,6 +36,16 @@ impl LlmTokenizer {
         let white_space_token_id = u32::try_from(tokenizer.encode_ordinary(" ").remove(0))?;
         Ok(Self {
             tokenizer: TokenizerBackend::Tiktoken(tokenizer),
+            tokenizer_path: None,
+            with_special_tokens: false,
+            white_space_token_id,
+        })
+    }
+
+    pub fn new_from_tokenizer(tokenizer: HFTokenizer) -> Result<Self> {
+        let white_space_token_id = tokenizer.encode(" ", false).unwrap().get_ids()[0];
+        Ok(Self {
+            tokenizer: TokenizerBackend::HuggingFacesTokenizer(tokenizer),
             tokenizer_path: None,
             with_special_tokens: false,
             white_space_token_id,

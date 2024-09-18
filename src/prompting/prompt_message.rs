@@ -1,4 +1,6 @@
-use super::*;
+use super::TextConcatenator;
+use crate::text_utils::local_content::load_content_path;
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PromptMessageType {
@@ -17,148 +19,160 @@ impl PromptMessageType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PromptMessage {
-    content: Option<Vec<String>>,
-    pub built_prompt_hashmap: HashMap<String, String>,
-    pub built_prompt_string: Option<String>,
+    content: std::cell::RefCell<Vec<String>>,
+    pub built_message_hashmap: std::cell::RefCell<HashMap<String, String>>,
+    pub built_message_string: std::cell::RefCell<Option<String>>,
     pub message_type: PromptMessageType,
-    pub concatenator: PromptConcatenator,
+    pub concatenator: TextConcatenator,
 }
 
 impl PromptMessage {
-    pub fn new(message_type: &PromptMessageType, concatenator: &PromptConcatenator) -> Self {
+    pub fn new(message_type: PromptMessageType, concatenator: &TextConcatenator) -> Self {
         Self {
-            content: None,
-            built_prompt_hashmap: HashMap::new(),
-            built_prompt_string: None,
-            message_type: message_type.clone(),
+            content: Vec::new().into(),
+            built_message_hashmap: HashMap::new().into(),
+            built_message_string: None.into(),
+            message_type,
             concatenator: concatenator.clone(),
         }
     }
-
-    pub fn set_content<T: AsRef<str>>(&mut self, content: T) -> &mut Self {
+    // Setter functions
+    pub fn set_content<T: AsRef<str>>(&self, content: T) -> &Self {
         if content.as_ref().is_empty() {
-            panic!("PromptMessage content cannot be empty");
+            return self;
         }
-        if let Some(existing) = &self.content {
-            if existing.len() == 1 && existing.iter().any(|c| c == content.as_ref()) {
-                return self;
-            }
-            self.built_prompt_hashmap.clear();
+
+        if self
+            .content_ref()
+            .first()
+            .map_or(true, |first| first != content.as_ref())
+        {
+            self.built_message_hashmap_mut().clear();
+            *self.built_message_string_mut() = None;
+            *self.content_mut() = vec![content.as_ref().to_owned()];
         }
-        self.content = Some(vec![content.as_ref().to_owned()]);
+
         self
     }
 
-    pub fn set_content_from_path(&mut self, content_path: &PathBuf) -> &mut Self {
+    pub fn set_content_from_path(&self, content_path: &PathBuf) -> &Self {
         self.set_content(load_content_path(content_path))
     }
 
-    pub fn prepend_content<T: AsRef<str>>(&mut self, content: T) -> &mut Self {
+    pub fn prepend_content<T: AsRef<str>>(&self, content: T) -> &Self {
         if content.as_ref().is_empty() {
-            panic!("PromptMessage content cannot be empty");
+            return self;
         }
-        if let Some(existing) = &mut self.content {
-            if existing.is_empty() || existing.iter().all(|c| c != content.as_ref()) {
-                self.built_prompt_hashmap.clear();
-                existing.insert(0, content.as_ref().to_owned());
-            }
-        } else {
-            self.content = Some(vec![content.as_ref().to_owned()]);
+
+        if self
+            .content_ref()
+            .first()
+            .map_or(true, |first| first != content.as_ref())
+        {
+            self.built_message_hashmap_mut().clear();
+            *self.built_message_string_mut() = None;
+            self.content_mut().insert(0, content.as_ref().to_owned());
         }
+
         self
     }
 
-    pub fn prepend_content_from_path(&mut self, content_path: &PathBuf) -> &mut Self {
+    pub fn prepend_content_from_path(&self, content_path: &PathBuf) -> &Self {
         self.prepend_content(load_content_path(content_path))
     }
 
-    pub fn append_content<T: AsRef<str>>(&mut self, content: T) -> &mut Self {
+    pub fn append_content<T: AsRef<str>>(&self, content: T) -> &Self {
         if content.as_ref().is_empty() {
-            panic!("PromptMessage content cannot be empty");
+            return self;
         }
-        if let Some(existing) = &mut self.content {
-            if existing.is_empty() || existing.iter().all(|c| c != content.as_ref()) {
-                self.built_prompt_hashmap.clear();
-                existing.push(content.as_ref().to_owned());
-            }
-        } else {
-            self.content = Some(vec![content.as_ref().to_owned()]);
+
+        if self
+            .content_ref()
+            .last()
+            .map_or(true, |last| last != content.as_ref())
+        {
+            self.built_message_hashmap_mut().clear();
+            *self.built_message_string_mut() = None;
+            self.content_mut().push(content.as_ref().to_owned());
         }
+
         self
     }
 
-    pub fn append_content_from_path(&mut self, content_path: &PathBuf) -> &mut Self {
+    pub fn append_content_from_path(&self, content_path: &PathBuf) -> &Self {
         self.append_content(load_content_path(content_path))
     }
 
-    pub fn requires_build(&self) -> bool {
-        self.content.is_some() && self.built_prompt_hashmap.is_empty()
+    // Getter functions
+    pub fn get_built_message_string(&self) -> Option<String> {
+        if self.built_message_string_ref().is_none() {
+            self.build();
+        }
+        self.built_message_string_ref().clone()
     }
 
-    pub fn build(&mut self) {
-        if let Some(built_prompt_string) = self.build_prompt_string() {
-            self.built_prompt_hashmap = HashMap::from([
+    // Builder functions
+    pub fn requires_build(&self) -> bool {
+        !self.content_ref().is_empty() && self.built_message_hashmap_ref().is_empty()
+    }
+
+    pub fn build(&self) {
+        if let Some(built_message_string) = self.build_prompt_string() {
+            *self.built_message_string_mut() = Some(built_message_string.clone());
+            *self.built_message_hashmap_mut() = HashMap::from([
                 ("role".to_string(), self.message_type.as_str().to_owned()),
-                ("content".to_string(), built_prompt_string.to_owned()),
+                ("content".to_string(), built_message_string.to_owned()),
             ]);
-            self.built_prompt_string = Some(built_prompt_string);
         }
     }
 
     fn build_prompt_string(&self) -> Option<String> {
-        let content = if let Some(content) = &self.content {
-            if content.is_empty() {
-                return None;
-            } else {
-                content
-            }
-        } else {
+        if self.content_ref().is_empty() {
             return None;
         };
-        let mut built_prompt_string = String::new();
+        let mut built_message_string = String::new();
 
-        for c in content {
+        for c in self.content_ref().iter() {
             if c.as_str().is_empty() {
                 continue;
             }
-            if !built_prompt_string.is_empty() {
-                built_prompt_string.push_str(self.concatenator.as_str());
+            if !built_message_string.is_empty() {
+                built_message_string.push_str(self.concatenator.as_str());
             }
-            built_prompt_string.push_str(c.as_str());
+            built_message_string.push_str(c.as_str());
         }
-        if built_prompt_string.is_empty() {
+        if built_message_string.is_empty() {
             return None;
         }
-        Some(built_prompt_string)
+        Some(built_message_string)
     }
-}
 
-pub fn add_system_message(messages: &mut Vec<PromptMessage>, concatenator: &PromptConcatenator) {
-    if !messages.is_empty() {
-        panic!("System message must be first message.");
-    };
-    let message = PromptMessage::new(&PromptMessageType::System, concatenator);
-    messages.push(message);
-}
-
-pub fn add_user_message(messages: &mut Vec<PromptMessage>, concatenator: &PromptConcatenator) {
-    if !messages.is_empty() && messages.last().unwrap().message_type == PromptMessageType::User {
-        panic!("Cannot add user message when previous message is user message.");
+    // Helper functions
+    fn content_ref(&self) -> std::cell::Ref<Vec<String>> {
+        self.content.borrow()
     }
-    let message = PromptMessage::new(&PromptMessageType::User, concatenator);
-    messages.push(message);
-}
 
-pub fn add_assistant_message(messages: &mut Vec<PromptMessage>, concatenator: &PromptConcatenator) {
-    if messages.is_empty() {
-        panic!("Cannot add assistant message as first message.");
-    } else if messages.last().unwrap().message_type == PromptMessageType::Assistant {
-        panic!("Cannot add assistant message when previous message is assistant message.");
-    };
-    let message = PromptMessage::new(&PromptMessageType::Assistant, concatenator);
-    messages.push(message);
+    fn content_mut(&self) -> std::cell::RefMut<Vec<String>> {
+        self.content.borrow_mut()
+    }
+
+    fn built_message_hashmap_ref(&self) -> std::cell::Ref<HashMap<String, String>> {
+        self.built_message_hashmap.borrow()
+    }
+
+    fn built_message_hashmap_mut(&self) -> std::cell::RefMut<HashMap<String, String>> {
+        self.built_message_hashmap.borrow_mut()
+    }
+
+    fn built_message_string_ref(&self) -> std::cell::Ref<Option<String>> {
+        self.built_message_string.borrow()
+    }
+
+    fn built_message_string_mut(&self) -> std::cell::RefMut<Option<String>> {
+        self.built_message_string.borrow_mut()
+    }
 }
 
 pub fn build_messages(messages: &mut [PromptMessage]) -> Vec<HashMap<String, String>> {
@@ -190,11 +204,11 @@ pub fn build_messages(messages: &mut [PromptMessage]) -> Vec<HashMap<String, Str
         if message.requires_build() {
             message.build();
         }
-        if message.built_prompt_hashmap.is_empty() {
+        if message.built_message_hashmap_ref().is_empty() {
             eprintln!("message.built_content is empty and skipped");
             continue;
         }
-        prompt_messages.push(message.built_prompt_hashmap.clone());
+        prompt_messages.push(message.built_message_hashmap_ref().clone());
     }
     prompt_messages
 }
@@ -206,18 +220,20 @@ impl std::fmt::Display for PromptMessage {
             PromptMessageType::User => "User",
             PromptMessageType::Assistant => "Assistant",
         };
-        let message = if let Some(built_prompt_string) = &self.built_prompt_string {
-            if built_prompt_string.len() > 300 {
-                format!(
-                    "{}...",
-                    built_prompt_string.chars().take(300).collect::<String>()
-                )
-            } else {
-                built_prompt_string.clone()
+        let message = match self.build_prompt_string() {
+            Some(built_message_string) => {
+                if built_message_string.len() > 300 {
+                    format!(
+                        "{}...",
+                        built_message_string.chars().take(300).collect::<String>()
+                    )
+                } else {
+                    built_message_string
+                }
             }
-        } else {
-            "debug message: empty or unbuilt".to_string()
+            None => "debug message: empty or unbuilt".to_string(),
         };
+
         writeln!(f, "\x1b[1m{message_type}\x1b[0m:\n{:?}", message)
     }
 }

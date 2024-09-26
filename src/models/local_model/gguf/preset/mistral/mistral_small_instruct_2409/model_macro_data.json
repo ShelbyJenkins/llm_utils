@@ -1,6 +1,6 @@
 {
     "model_id": "Mistral-Small-Instruct-2409",
-    "gguf_repo_id": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+    "gguf_repo_id": "bartowski/Mistral-Small-Instruct-2409-GGUF",
     "number_of_parameters": 12,
     "f_name_for_q_bits": {
         "q8": "Mistral-Small-Instruct-2409-Q8_0.gguf",

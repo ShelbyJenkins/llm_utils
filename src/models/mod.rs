@@ -6,7 +6,7 @@ pub mod local_model;
 #[derive(Clone)]
 pub struct LlmModelBase {
     pub model_id: String,
-    pub context_length: u32,
-    pub max_tokens_output: u32,
+    pub model_ctx_size: u64,
+    pub inference_ctx_size: u64,
     pub tokenizer: std::sync::Arc<LlmTokenizer>,
 }

@@ -132,7 +132,7 @@ impl DfsTextChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::local_model::preset::LlmPreset;
+    use crate::models::local_model::gguf::preset::LlmPreset;
 
     fn runner(
         tokenizer: &std::sync::Arc<LlmTokenizer>,

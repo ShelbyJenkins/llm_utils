@@ -551,7 +551,7 @@ impl std::fmt::Debug for ChunkerResult {
 mod tests {
     use super::*;
     use crate::text_utils::test_text::*;
-    use crate::models::local_model::preset::LlmPreset;
+    use crate::models::local_model::gguf::preset::LlmPreset;
 
     fn run_test(case: u32, content: &str, tokenizer: &Arc<LlmTokenizer>) -> Option<ChunkerResult> {
        TextChunker::new_with_tokenizer(tokenizer)

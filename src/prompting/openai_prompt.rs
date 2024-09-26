@@ -5,7 +5,7 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct OpenAiPrompt {
     pub built_prompt_hashmap: std::cell::RefCell<Option<Vec<HashMap<String, String>>>>,
-    pub total_prompt_tokens: std::cell::RefCell<Option<u32>>,
+    pub total_prompt_tokens: std::cell::RefCell<Option<u64>>,
     pub concatenator: TextConcatenator,
     pub messages: std::cell::RefCell<Vec<PromptMessage>>,
     pub api_llm: ApiLlmModel,

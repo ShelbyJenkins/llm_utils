@@ -3,12 +3,19 @@
 //! Spec: https://github.com/philpax/ggml/blob/gguf-spec/docs/gguf.md
 //! Adapted from: https://github.com/huggingface/candle/blob/main/candle-core/src/quantized/gguf_file.rs
 
-use crate::Result;
+use super::gguf_tensors::{GgmlDType, TensorInfo};
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const DEFAULT_ALIGNMENT: u64 = 32;
+pub const DEFAULT_ALIGNMENT: u32 = 32;
+
+pub struct GgufFile {
+    pub magic: VersionedMagic,
+    pub metadata: HashMap<String, Value>,
+    pub tensors: Vec<TensorInfo>,
+    pub tensor_data_offset: u64,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Magic {
@@ -17,7 +24,7 @@ enum Magic {
 
 impl TryFrom<u32> for Magic {
     type Error = crate::Error;
-    fn try_from(value: u32) -> Result<Self> {
+    fn try_from(value: u32) -> crate::Result<Self> {
         let magic = match value {
             0x46554747 | 0x47475546 => Self::Gguf,
             _ => crate::bail!("unknown magic 0x{value:08x}"),
@@ -34,7 +41,7 @@ pub enum VersionedMagic {
 }
 
 impl VersionedMagic {
-    fn read<R: std::io::Read>(reader: &mut R) -> Result<Self> {
+    fn read<R: std::io::Read>(reader: &mut R) -> crate::Result<Self> {
         let magic = reader.read_u32::<LittleEndian>()?;
         let magic = Magic::try_from(magic)?;
         let version = reader.read_u32::<LittleEndian>()?;
@@ -48,17 +55,11 @@ impl VersionedMagic {
     }
 }
 
-#[derive(Debug)]
-pub struct Content {
-    pub magic: VersionedMagic,
-    pub metadata: HashMap<String, Value>,
-}
-
-impl Content {
-    pub fn read<R: std::io::Seek + std::io::Read>(reader: &mut R) -> Result<Self> {
+impl GgufFile {
+    pub fn read<R: std::io::Seek + std::io::Read>(reader: &mut R) -> crate::Result<Self> {
         let magic = VersionedMagic::read(reader)?;
 
-        let _tensor_count = match magic {
+        let tensor_count = match magic {
             VersionedMagic::GgufV1 => reader.read_u32::<LittleEndian>()? as usize,
             VersionedMagic::GgufV2 | VersionedMagic::GgufV3 => {
                 reader.read_u64::<LittleEndian>()? as usize
@@ -80,11 +81,84 @@ impl Content {
             metadata.insert(key, value);
         }
 
-        Ok(Self { magic, metadata })
+        let mut tensor_infos = vec![];
+        for _idx in 0..tensor_count {
+            let tensor_name = read_string(reader, &magic)?;
+            let n_dimensions = reader.read_u32::<LittleEndian>()?;
+
+            let mut dimensions: Vec<usize> = match magic {
+                VersionedMagic::GgufV1 => {
+                    let mut dimensions = vec![0; n_dimensions as usize];
+                    reader.read_u32_into::<LittleEndian>(&mut dimensions)?;
+                    dimensions.into_iter().map(|c| c as usize).collect()
+                }
+                VersionedMagic::GgufV2 | VersionedMagic::GgufV3 => {
+                    let mut dimensions = vec![0; n_dimensions as usize];
+                    reader.read_u64_into::<LittleEndian>(&mut dimensions)?;
+                    dimensions.into_iter().map(|c| c as usize).collect()
+                }
+            };
+            dimensions.reverse();
+
+            let ggml_dtype = reader.read_u32::<LittleEndian>()?;
+            let ggml_dtype = GgmlDType::from_u32(ggml_dtype)?;
+
+            let offset = reader.read_u64::<LittleEndian>()?;
+            tensor_infos.push(TensorInfo {
+                name: tensor_name,
+                shape: dimensions,
+                offset,
+                ggml_dtype,
+            });
+        }
+        let position = reader.stream_position()?;
+        let alignment = match metadata.get("general.alignment") {
+            Some(Value::U8(v)) => *v as u32,
+            Some(Value::U16(v)) => *v as u32,
+            Some(Value::U32(v)) => *v as u32,
+            Some(Value::I8(v)) if *v >= 0 => *v as u32,
+            Some(Value::I16(v)) if *v >= 0 => *v as u32,
+            Some(Value::I32(v)) if *v >= 0 => *v as u32,
+            _ => DEFAULT_ALIGNMENT,
+        };
+        metadata.insert("general.alignment".to_string(), Value::U32(alignment));
+        let alignment = alignment as u64;
+        let tensor_data_offset = (position + alignment - 1) / alignment * alignment;
+        Ok(Self {
+            magic,
+            metadata,
+            tensors: tensor_infos,
+            tensor_data_offset,
+        })
+    }
+
+    pub fn get_value<T: FromValue>(&self, key: &str) -> crate::Result<T> {
+        match self.metadata.get(key) {
+            Some(value) => T::from_value(value),
+            None => T::from_none(key),
+        }
+    }
+
+    pub fn get_pathed_value<T: FromValue>(
+        &self,
+        path_prefixes: &[&str],
+        field_name: &str,
+    ) -> crate::Result<T> {
+        let prop_key = if path_prefixes.is_empty() {
+            field_name.to_string()
+        } else {
+            let prefix = path_prefixes.join(".");
+            format!("{}.{}", prefix, field_name)
+        };
+        self.get_value(&prop_key)
+    }
+
+    pub fn size(&self) -> u64 {
+        self.tensors.iter().map(|t| t.size()).sum()
     }
 }
 
-fn read_string<R: std::io::Read>(reader: &mut R, magic: &VersionedMagic) -> Result<String> {
+fn read_string<R: std::io::Read>(reader: &mut R, magic: &VersionedMagic) -> crate::Result<String> {
     let len = match magic {
         VersionedMagic::GgufV1 => reader.read_u32::<LittleEndian>()? as usize,
         VersionedMagic::GgufV2 | VersionedMagic::GgufV3 => {
@@ -134,6 +208,44 @@ pub enum ValueType {
     Array,
 }
 
+impl ValueType {
+    fn from_u32(v: u32) -> crate::Result<Self> {
+        let v = match v {
+            0 => Self::U8,
+            1 => Self::I8,
+            2 => Self::U16,
+            3 => Self::I16,
+            4 => Self::U32,
+            5 => Self::I32,
+            6 => Self::F32,
+            7 => Self::Bool,
+            8 => Self::String,
+            9 => Self::Array,
+            10 => Self::U64,
+            11 => Self::I64,
+            12 => Self::F64,
+            v => {
+                let bytes = v.to_le_bytes();
+                let as_le = u32::from_le_bytes(bytes);
+                let as_be = u32::from_be_bytes(bytes);
+                let ascii_le = String::from_utf8_lossy(&bytes).to_string();
+                let ascii_be =
+                    String::from_utf8_lossy(&bytes.iter().rev().cloned().collect::<Vec<u8>>())
+                        .to_string();
+
+                crate::bail!(format!(
+                    "Unrecognized value-type: {v} (0x{v:08x})\n\
+                    As little-endian: {as_le} (0x{as_le:08x})\n\
+                    As big-endian: {as_be} (0x{as_be:08x})\n\
+                    ASCII (LE): {ascii_le}\n\
+                    ASCII (BE): {ascii_be}"
+                ))
+            }
+        };
+        Ok(v)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
     U8(u8),
@@ -170,42 +282,42 @@ impl Value {
         }
     }
 
-    pub fn to_u8(&self) -> Result<u8> {
+    pub fn to_u8(&self) -> crate::Result<u8> {
         match self {
             Self::U8(v) => Ok(*v),
             v => crate::bail!("not a u8 {v:?}"),
         }
     }
 
-    pub fn to_i8(&self) -> Result<i8> {
+    pub fn to_i8(&self) -> crate::Result<i8> {
         match self {
             Self::I8(v) => Ok(*v),
             v => crate::bail!("not a i8 {v:?}"),
         }
     }
 
-    pub fn to_u16(&self) -> Result<u16> {
+    pub fn to_u16(&self) -> crate::Result<u16> {
         match self {
             Self::U16(v) => Ok(*v),
             v => crate::bail!("not a u16 {v:?}"),
         }
     }
 
-    pub fn to_i16(&self) -> Result<i16> {
+    pub fn to_i16(&self) -> crate::Result<i16> {
         match self {
             Self::I16(v) => Ok(*v),
             v => crate::bail!("not a i16 {v:?}"),
         }
     }
 
-    pub fn to_u32(&self) -> Result<u32> {
+    pub fn to_u32(&self) -> crate::Result<u32> {
         match self {
             Self::U32(v) => Ok(*v),
             v => crate::bail!("not a u32 {v:?}"),
         }
     }
 
-    pub fn to_i32(&self) -> Result<i32> {
+    pub fn to_i32(&self) -> crate::Result<i32> {
         match self {
             Self::I32(v) => Ok(*v),
             v => crate::bail!("not a i32 {v:?}"),
@@ -213,7 +325,7 @@ impl Value {
     }
 
     /// This will also automatically upcast any integral types which will not truncate.
-    pub fn to_u64(&self) -> Result<u64> {
+    pub fn to_u64(&self) -> crate::Result<u64> {
         match self {
             Self::U64(v) => Ok(*v),
             // Autoupcast cases here
@@ -225,42 +337,42 @@ impl Value {
         }
     }
 
-    pub fn to_i64(&self) -> Result<i64> {
+    pub fn to_i64(&self) -> crate::Result<i64> {
         match self {
             Self::I64(v) => Ok(*v),
             v => crate::bail!("not a i64 {v:?}"),
         }
     }
 
-    pub fn to_f32(&self) -> Result<f32> {
+    pub fn to_f32(&self) -> crate::Result<f32> {
         match self {
             Self::F32(v) => Ok(*v),
             v => crate::bail!("not a f32 {v:?}"),
         }
     }
 
-    pub fn to_f64(&self) -> Result<f64> {
+    pub fn to_f64(&self) -> crate::Result<f64> {
         match self {
             Self::F64(v) => Ok(*v),
             v => crate::bail!("not a f64 {v:?}"),
         }
     }
 
-    pub fn to_bool(&self) -> Result<bool> {
+    pub fn to_bool(&self) -> crate::Result<bool> {
         match self {
             Self::Bool(v) => Ok(*v),
             v => crate::bail!("not a bool {v:?}"),
         }
     }
 
-    pub fn to_vec(&self) -> Result<&Vec<Value>> {
+    pub fn to_vec(&self) -> crate::Result<&Vec<Value>> {
         match self {
             Self::Array(v) => Ok(v),
             v => crate::bail!("not a vec {v:?}"),
         }
     }
 
-    pub fn to_string(&self) -> Result<&String> {
+    pub fn to_string(&self) -> crate::Result<&String> {
         match self {
             Self::String(v) => Ok(v),
             v => crate::bail!("not a string {v:?}"),
@@ -271,7 +383,7 @@ impl Value {
         reader: &mut R,
         value_type: ValueType,
         magic: &VersionedMagic,
-    ) -> Result<Self> {
+    ) -> crate::Result<Self> {
         let v = match value_type {
             ValueType::U8 => Self::U8(reader.read_u8()?),
             ValueType::I8 => Self::I8(reader.read_i8()?),
@@ -309,40 +421,59 @@ impl Value {
     }
 }
 
-impl ValueType {
-    fn from_u32(v: u32) -> Result<Self> {
-        let v = match v {
-            0 => Self::U8,
-            1 => Self::I8,
-            2 => Self::U16,
-            3 => Self::I16,
-            4 => Self::U32,
-            5 => Self::I32,
-            6 => Self::F32,
-            7 => Self::Bool,
-            8 => Self::String,
-            9 => Self::Array,
-            10 => Self::U64,
-            11 => Self::I64,
-            12 => Self::F64,
-            v => {
-                let bytes = v.to_le_bytes();
-                let as_le = u32::from_le_bytes(bytes);
-                let as_be = u32::from_be_bytes(bytes);
-                let ascii_le = String::from_utf8_lossy(&bytes).to_string();
-                let ascii_be =
-                    String::from_utf8_lossy(&bytes.iter().rev().cloned().collect::<Vec<u8>>())
-                        .to_string();
+pub trait FromValue: Sized {
+    fn from_value(value: &Value) -> crate::Result<Self>;
 
-                crate::bail!(format!(
-                    "Unrecognized value-type: {v} (0x{v:08x})\n\
-                    As little-endian: {as_le} (0x{as_le:08x})\n\
-                    As big-endian: {as_be} (0x{as_be:08x})\n\
-                    ASCII (LE): {ascii_le}\n\
-                    ASCII (BE): {ascii_be}"
-                ))
-            }
-        };
-        Ok(v)
+    fn from_none(key: &str) -> crate::Result<Self> {
+        crate::bail!("missing key {key}")
+    }
+}
+
+impl FromValue for String {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        value.to_string().cloned()
+    }
+}
+
+impl FromValue for u64 {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        value.to_u64()
+    }
+}
+
+impl FromValue for u32 {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        value.to_u32()
+    }
+}
+
+impl FromValue for f32 {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        value.to_f32()
+    }
+}
+
+impl FromValue for bool {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        value.to_bool()
+    }
+}
+
+impl<T: FromValue> FromValue for Vec<T> {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        match value {
+            Value::Array(arr) => arr.iter().map(T::from_value).collect(),
+            _ => crate::bail!("not an array"),
+        }
+    }
+}
+
+impl<T: FromValue> FromValue for Option<T> {
+    fn from_value(value: &Value) -> crate::Result<Self> {
+        Ok(Some(T::from_value(value)?))
+    }
+
+    fn from_none(_key: &str) -> crate::Result<Self> {
+        Ok(None)
     }
 }

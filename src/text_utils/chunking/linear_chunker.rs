@@ -185,8 +185,7 @@ impl LinearChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::local_model::preset::LlmPreset, text_utils::test_text::*};
-
+    use crate::{models::local_model::gguf::preset::LlmPreset, text_utils::test_text::*};
     fn runner(
         tokenizer: &Arc<LlmTokenizer>,
         separator: Separator,

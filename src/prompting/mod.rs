@@ -95,7 +95,7 @@ impl LlmPrompt {
     }
 
     // Getter functions
-    pub fn get_total_prompt_tokens(&self) -> crate::Result<u32> {
+    pub fn get_total_prompt_tokens(&self) -> crate::Result<u64> {
         if self.total_prompt_tokens().is_none() {
             self.build_prompt()?;
         };
@@ -212,7 +212,7 @@ impl LlmPrompt {
         }
     }
 
-    fn total_prompt_tokens(&self) -> std::cell::Ref<Option<u32>> {
+    fn total_prompt_tokens(&self) -> std::cell::Ref<Option<u64>> {
         match self {
             LlmPrompt::ChatTemplatePrompt(p) => p.total_prompt_tokens.borrow(),
             LlmPrompt::OpenAiPrompt(p) => p.total_prompt_tokens.borrow(),

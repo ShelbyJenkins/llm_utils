@@ -1,40 +1,12 @@
 use crate::tokenizer::LlmTokenizer;
 use thiserror::Error;
 
-pub const DEFAULT_SAFETY_TOKENS: u32 = 10;
-
-pub fn total_prompt_tokens_openai_format(
-    prompt: &Vec<std::collections::HashMap<String, String>>,
-    tokens_per_message: u32,
-    tokens_per_name: Option<i32>,
-    tokenizer: &std::sync::Arc<LlmTokenizer>,
-) -> u32 {
-    let mut num_tokens = 0;
-    for message in prompt {
-        num_tokens += tokens_per_message;
-
-        for (key, value) in message.iter() {
-            num_tokens += tokenizer.count_tokens(value);
-            if let Some(tokens_per_name) = tokens_per_name {
-                if key == "name" {
-                    if tokens_per_name < 0 {
-                        // Handles cases for certain models where name doesn't count towards token count
-                        num_tokens -= tokens_per_name.unsigned_abs();
-                    } else {
-                        num_tokens += tokens_per_name as u32;
-                    }
-                }
-            }
-        }
-    }
-    num_tokens += 3; // every reply is primed with <|start|>assistant<|message|>
-    num_tokens
-}
+pub const DEFAULT_SAFETY_TOKENS: u64 = 10;
 
 /// Sets and validates the 'max_tokens' or 'n_ctx' or 'n_predict' parameter for a request.
 /// First, it checks that the total_prompt_tokens is less than the ctx_size - safety_tokens.
 /// Then returns 'available_tokens' as the lower of either:
-/// ctx_size - total_prompt_tokens - safety_tokens or if it's provided, ctx_output_size.
+/// ctx_size - total_prompt_tokens - safety_tokens or if it's provided, inference_ctx_size.
 /// If 'requested_tokens' is provided, 'requested_tokens' is returned if less than 'available_tokens'.
 /// If 'requested_tokens' is 'None' or 'requested_tokens' is greater than 'available_tokens',
 /// 'available_tokens' is returned.
@@ -42,7 +14,7 @@ pub fn total_prompt_tokens_openai_format(
 /// # Arguments
 ///
 /// * `ctx_size` - The total context length for the for the model or system.
-/// * `ctx_output_size` - Optional output size for models with output generation limits. Defaults to None.
+/// * `inference_ctx_size` - Optional output size for models with output generation limits. Defaults to None.
 /// * `total_prompt_tokens` - The total prompt tokens as an unsigned 32-bit integer.
 /// * `safety_tokens` - Optional padding. Defaults to 10.
 /// * `requested_tokens` - Optional 'max_tokens' for the response. Defaults to 'available_tokens'.
@@ -55,15 +27,15 @@ pub fn total_prompt_tokens_openai_format(
 ///
 /// Returns an error if any of the validation checks fail.
 pub fn check_and_get_max_tokens(
-    ctx_size: u32,
-    ctx_output_size: Option<u32>,
-    total_prompt_tokens: u32,
-    safety_tokens: Option<u32>,
-    requested_tokens: Option<u32>,
-) -> Result<u32, RequestTokenLimitError> {
+    ctx_size: u64,
+    inference_ctx_size: Option<u64>,
+    total_prompt_tokens: u64,
+    safety_tokens: Option<u64>,
+    requested_tokens: Option<u64>,
+) -> Result<u64, RequestTokenLimitError> {
     let available_tokens = available_tokens(
         ctx_size,
-        ctx_output_size,
+        inference_ctx_size,
         total_prompt_tokens,
         safety_tokens,
     )?;
@@ -80,7 +52,7 @@ pub fn check_and_get_max_tokens(
         available_tokens
     };
 
-    if total_prompt_tokens + requested_tokens >= ctx_size {
+    if total_prompt_tokens as u64 + requested_tokens as u64 >= ctx_size {
         panic!(
             "total_prompt_tokens ({total_prompt_tokens}) + requested_tokens ({requested_tokens}) >= ctx_size ({ctx_size}). This should never happen.",
         );
@@ -88,23 +60,23 @@ pub fn check_and_get_max_tokens(
     Ok(requested_tokens)
 }
 
-pub fn available_tokens(
-    ctx_size: u32,
-    ctx_output_size: Option<u32>,
-    total_prompt_tokens: u32,
-    safety_tokens: Option<u32>,
-) -> Result<u32, RequestTokenLimitError> {
+pub(crate) fn available_tokens(
+    ctx_size: u64,
+    inference_ctx_size: Option<u64>,
+    total_prompt_tokens: u64,
+    safety_tokens: Option<u64>,
+) -> Result<u64, RequestTokenLimitError> {
     let safety_tokens = safety_tokens.unwrap_or(DEFAULT_SAFETY_TOKENS);
 
-    if total_prompt_tokens >= ctx_size - safety_tokens {
+    if total_prompt_tokens as u64 >= ctx_size - safety_tokens {
         return Err(RequestTokenLimitError::PromptTokensExceeds {
             total_prompt_tokens,
             ctx_size: ctx_size - safety_tokens,
         });
     }
 
-    let available_tokens = if let Some(ctx_output_size) = ctx_output_size {
-        std::cmp::min(ctx_size - total_prompt_tokens, ctx_output_size) - safety_tokens
+    let available_tokens = if let Some(inference_ctx_size) = inference_ctx_size {
+        std::cmp::min(ctx_size - total_prompt_tokens, inference_ctx_size) - safety_tokens
     } else {
         ctx_size - total_prompt_tokens - safety_tokens
     };
@@ -114,18 +86,46 @@ pub fn available_tokens(
     Ok(available_tokens - safety_tokens)
 }
 
+pub(crate) fn total_prompt_tokens_openai_format(
+    prompt: &Vec<std::collections::HashMap<String, String>>,
+    tokens_per_message: u32,
+    tokens_per_name: Option<i32>,
+    tokenizer: &std::sync::Arc<LlmTokenizer>,
+) -> u64 {
+    let mut num_tokens: u64 = 0;
+    for message in prompt {
+        num_tokens += tokens_per_message as u64;
+
+        for (key, value) in message.iter() {
+            num_tokens += tokenizer.count_tokens(value) as u64;
+            if let Some(tokens_per_name) = tokens_per_name {
+                if key == "name" {
+                    if tokens_per_name < 0 {
+                        // Handles cases for certain models where name doesn't count towards token count
+                        num_tokens -= tokens_per_name.unsigned_abs() as u64;
+                    } else {
+                        num_tokens += tokens_per_name as u64;
+                    }
+                }
+            }
+        }
+    }
+    num_tokens += 3; // every reply is primed with <|start|>assistant<|message|>
+    num_tokens
+}
+
 #[derive(Debug, Clone)]
 pub struct TokenState {
-    pub actual_request: u32,
-    pub requested_response: u32,
+    pub actual_request: u64,
+    pub requested_response: u64,
 }
 
 #[derive(Error, Debug, Clone)]
 pub enum RequestTokenLimitError {
     #[error("total_prompt_tokens ({total_prompt_tokens}) exceeds ctx_size ({ctx_size})")]
     PromptTokensExceeds {
-        total_prompt_tokens: u32,
-        ctx_size: u32,
+        total_prompt_tokens: u64,
+        ctx_size: u64,
     },
     #[error("GenericPromptError: {e}")]
     GenericPromptError { e: String },

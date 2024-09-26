@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub struct ChatTemplatePrompt {
     pub built_prompt_string: std::cell::RefCell<Option<String>>,
     pub built_prompt_as_tokens: std::cell::RefCell<Option<Vec<u32>>>,
-    pub total_prompt_tokens: std::cell::RefCell<Option<u32>>,
+    pub total_prompt_tokens: std::cell::RefCell<Option<u64>>,
     pub concatenator: TextConcatenator,
     pub chat_template: LlmChatTemplate,
     pub messages: std::cell::RefCell<Vec<PromptMessage>>,
@@ -68,7 +68,7 @@ impl ChatTemplatePrompt {
         }
 
         let built_prompt_as_tokens = self.tokenizer.tokenize(&built_prompt_string);
-        *self.total_prompt_tokens.borrow_mut() = Some(built_prompt_as_tokens.len() as u32);
+        *self.total_prompt_tokens.borrow_mut() = Some(built_prompt_as_tokens.len() as u64);
         *self.built_prompt_as_tokens.borrow_mut() = Some(built_prompt_as_tokens);
         *self.built_prompt_string.borrow_mut() = Some(built_prompt_string.clone());
         built_prompt_string
@@ -158,11 +158,10 @@ fn raise_exception(msg: String) -> Result<String, minijinja::Error> {
 mod tests {
 
     use crate::{
-        models::local_model::{preset::LlmPreset, LocalLlmModel},
+        models::local_model::{gguf::preset::LlmPreset, LocalLlmModel},
         prompting::{chat_template_prompt::apply_chat_template, LlmPrompt},
     };
     use std::collections::HashMap;
-
     #[test]
     fn test_chat() {
         let model = LocalLlmModel::default();
@@ -190,7 +189,7 @@ mod tests {
         let token_count = prompt.get_total_prompt_tokens().unwrap();
         let prompt_as_tokens = prompt.get_built_prompt_as_tokens().unwrap();
         assert_eq!(54, token_count);
-        assert_eq!(token_count, prompt_as_tokens.len() as u32);
+        assert_eq!(token_count, prompt_as_tokens.len() as u64);
 
         prompt.set_generation_prefix("Generating 12345:");
         let test_chat = prompt.get_built_prompt_string().unwrap();
@@ -202,7 +201,7 @@ mod tests {
         let token_count = prompt.get_total_prompt_tokens().unwrap();
         let prompt_as_tokens = prompt.get_built_prompt_as_tokens().unwrap();
         assert_eq!(63, token_count);
-        assert_eq!(token_count, prompt_as_tokens.len() as u32);
+        assert_eq!(token_count, prompt_as_tokens.len() as u64);
     }
 
     const USER_PROMPT_1: &str = "tell me a joke";

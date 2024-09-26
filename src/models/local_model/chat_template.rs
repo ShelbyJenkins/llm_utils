@@ -1,9 +1,9 @@
-use super::gguf::gguf_metadata::GgufMetadata;
+use super::metadata::tokenizer::TokenizerMetadata;
 use anyhow::Context;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Clone, PartialEq)]
 pub struct LlmChatTemplate {
     pub chat_template: String,
     pub bos_token: String,
@@ -13,9 +13,7 @@ pub struct LlmChatTemplate {
 }
 
 impl LlmChatTemplate {
-    pub fn chat_template_from_local(
-        tokenizer_config_json_path: &std::path::PathBuf,
-    ) -> crate::Result<Self> {
+    pub fn from_local_path(tokenizer_config_json_path: &std::path::PathBuf) -> crate::Result<Self> {
         let file = std::fs::File::open(tokenizer_config_json_path)?;
         let reader = std::io::BufReader::new(file);
         let mut chat_template: LlmChatTemplate = serde_json::from_reader(reader)?;
@@ -23,32 +21,33 @@ impl LlmChatTemplate {
         Ok(chat_template)
     }
 
-    pub fn chat_template_from_gguf(metadata: &GgufMetadata) -> crate::Result<Self> {
-        let chat_template: String = if let Some(chat_template) =
-            metadata.get_option_value(&["tokenizer"], "chat_template")?
-        {
+    pub fn from_gguf_tokenizer(tokenizer: &TokenizerMetadata) -> crate::Result<Self> {
+        let chat_template = if let Some(chat_template) = &tokenizer.chat_template {
             chat_template
         } else {
-            crate::bail!("chat_template not found in metadata");
+            anyhow::bail!("chat_template not found.");
         };
-        let tokens: Vec<String> = metadata.get_value(&["tokenizer", "ggml"], "tokens")?;
-        let bos_token_id: u32 = metadata.get_value(&["tokenizer", "ggml"], "bos_token_id")?;
-        let bos_token = tokens
-            .get(bos_token_id as usize)
-            .map(ToString::to_string)
-            .with_context(|| format!("Token not found for ID: {}", bos_token_id))?;
+        let ggml = if let Some(ggml) = &tokenizer.ggml {
+            ggml
+        } else {
+            anyhow::bail!("GGML tokenizer model not found.");
+        };
 
-        let eos_token_id: u32 = metadata.get_value(&["tokenizer", "ggml"], "eos_token_id")?;
-        let eos_token = tokens
-            .get(eos_token_id as usize)
+        let bos_token = ggml
+            .tokens
+            .get(ggml.bos_token_id as usize)
             .map(ToString::to_string)
-            .with_context(|| format!("Token not found for ID: {}", eos_token_id))?;
+            .with_context(|| format!("Token not found for ID: {}", ggml.bos_token_id))?;
 
-        let unk_token_id: Option<u32> =
-            metadata.get_option_value(&["tokenizer", "ggml"], "unk_token_id")?;
-        let unk_token = if let Some(unk_token_id) = unk_token_id {
+        let eos_token = ggml
+            .tokens
+            .get(ggml.eos_token_id as usize)
+            .map(ToString::to_string)
+            .with_context(|| format!("Token not found for ID: {}", ggml.eos_token_id))?;
+
+        let unk_token = if let Some(unk_token_id) = ggml.unknown_token_id {
             Some(
-                tokens
+                ggml.tokens
                     .get(unk_token_id as usize)
                     .map(ToString::to_string)
                     .with_context(|| format!("Token not found for ID: {}", unk_token_id))?,
@@ -58,7 +57,7 @@ impl LlmChatTemplate {
         };
 
         let mut chat_template = LlmChatTemplate {
-            chat_template,
+            chat_template: chat_template.to_owned(),
             bos_token,
             eos_token,
             unk_token,
@@ -124,15 +123,26 @@ impl LlmChatTemplate {
     }
 }
 
+impl std::fmt::Debug for LlmChatTemplate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug_struct = f.debug_struct("LlmChatTemplate");
+        debug_struct.field("chat_template", &"string too long to print nicely");
+        debug_struct.field("bos_token", &self.bos_token);
+        debug_struct.field("eos_token", &self.eos_token);
+        debug_struct.field("unk_token", &self.unk_token);
+        debug_struct.finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::models::local_model::{gguf::GgufLoader, LlmPresetTrait};
+    use crate::models::local_model::{gguf::GgufLoader, GgufPresetTrait};
 
     #[test]
     fn test_base_generation_prefix() {
         let model = GgufLoader::default()
             .llama3_1_8b_instruct()
-            .available_vram(48)
+            .preset_with_available_vram_gb(48)
             .load()
             .unwrap();
         assert_eq!(
@@ -141,7 +151,7 @@ mod tests {
         );
         let model = GgufLoader::default()
             .mistral7b_instruct_v0_3()
-            .available_vram(48)
+            .preset_with_available_vram_gb(48)
             .load()
             .unwrap();
         assert_eq!(
@@ -150,7 +160,7 @@ mod tests {
         );
         let model = GgufLoader::default()
             .phi3_5_mini_instruct()
-            .available_vram(48)
+            .preset_with_available_vram_gb(48)
             .load()
             .unwrap();
         assert_eq!(

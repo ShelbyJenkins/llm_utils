@@ -8,26 +8,11 @@
 //! 7. Add a test to llm_utils/src/models/local_model/preset/mod.rs/tests for the new model
 //! 8. Add a test_base_generation_prefix test case to llm_utils/src/models/local_model/chat_template.rs/tests for the new model
 use crate::models::local_model::{
-    model_metadata::model_metadata_from_local,
+    gguf::loaders::preset::GgufPresetLoader,
+    metadata::config_json::ConfigJson,
     GgufLoader,
-    LocalLlmMetadata,
     LocalLlmModel,
 };
-pub struct LlmPresetLoader {
-    pub llm_preset: LlmPreset,
-    pub available_vram: u32,
-    pub use_ctx_size: Option<u32>,
-}
-
-impl Default for LlmPresetLoader {
-    fn default() -> Self {
-        Self {
-            llm_preset: LlmPreset::Llama3_1_8bInstruct,
-            available_vram: 12,
-            use_ctx_size: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct LlmPresetData {
@@ -47,6 +32,7 @@ impl LlmPresetData {
             .join("src")
             .join("models")
             .join("local_model")
+            .join("gguf")
             .join("preset")
             .join(path)
             .join("model_macro_data.json");
@@ -101,8 +87,8 @@ macro_rules! generate_models {
                 &self.get_data().gguf_repo_id
             }
 
-            pub fn model_metadata(&self) -> crate::Result<LocalLlmMetadata> {
-                model_metadata_from_local(&self.config_json_path())
+            pub fn config_json(&self) -> crate::Result<ConfigJson> {
+                ConfigJson::from_local_path(&self.config_json_path())
             }
 
             pub fn f_name_for_q_bits(&self, q_bits: u8) -> Option<String> {
@@ -130,6 +116,7 @@ macro_rules! generate_models {
                     .join("src")
                     .join("models")
                     .join("local_model")
+                    .join("gguf")
                     .join("preset")
             }
 
@@ -175,27 +162,28 @@ macro_rules! generate_models {
 
             pub fn load(&self) -> crate::Result<LocalLlmModel> {
                 let mut loader = GgufLoader::default();
-                loader.preset_loader.llm_preset = self.clone();
+                loader.gguf_preset_loader.llm_preset = self.clone();
                 loader.load()
             }
         }
 
-        pub trait LlmPresetTrait {
-            fn preset_loader(&mut self) -> &mut LlmPresetLoader;
+        pub trait GgufPresetTrait {
+            fn preset_loader(&mut self) -> &mut GgufPresetLoader;
 
-            fn available_vram(mut self, available_vram: u32) -> Self
+            fn preset_with_available_vram_gb(mut self, preset_with_available_vram_gb: u32) -> Self
             where
                 Self: Sized,
             {
-                self.preset_loader().available_vram = available_vram;
+                self.preset_loader().preset_with_available_vram_gb = Some(preset_with_available_vram_gb);
                 self
             }
 
-            fn use_ctx_size(mut self, use_ctx_size: u32) -> Self
+
+            fn preset_with_quantization_level(mut self, level: u8) -> Self
             where
                 Self: Sized,
             {
-                self.preset_loader().use_ctx_size = Some(use_ctx_size);
+                self.preset_loader().preset_with_quantization_level = Some(level);
                 self
             }
 
@@ -203,21 +191,25 @@ macro_rules! generate_models {
                 paste::paste! {
                     fn [<$variant:snake>](mut self) -> Self
                     where
-                    Self: Sized,
+                        Self: Sized,
                     {
                         self.preset_loader().llm_preset = $enum_name::$variant;
                         self
                     }
                 }
             )*
+
         }
+
+
     };
 }
 
 generate_models!(
     LlmPreset {
         Llama3_1_8bInstruct => "llama/llama3_1_8b_instruct",
-        Llama3_70bInstruct => "llama/llama3_70b_instruct",
+        Llama3_2_3bInstruct => "llama/llama3_2_3b_instruct",
+        Llama3_2_1bInstruct => "llama/llama3_2_1b_instruct",
         Mistral7bInstructV0_3 => "mistral/mistral7b_instruct_v0_3",
         Mixtral8x7bInstructV0_1 => "mistral/mixtral8x7b_instruct_v0_1",
         MistralNemoInstruct2407 => "mistral/mistral_nemo_instruct_2407",
@@ -248,73 +240,11 @@ mod tests {
         for variant in variants {
             println!("{:#?}", variant.model_id());
             println!("{:#?}", variant.gguf_repo_id());
-            println!("{:#?}", variant.model_metadata());
+            println!("{:#?}", variant.config_json());
             println!("{:#?}", variant.number_of_parameters());
             for i in 1..=8 {
                 println!("{:#?}", variant.f_name_for_q_bits(i));
             }
         }
-    }
-
-    #[test]
-    fn load() {
-        let model: LocalLlmModel = GgufLoader::default()
-            .llama3_1_8b_instruct()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model = GgufLoader::default()
-            .mistral7b_instruct_v0_3()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model = GgufLoader::default()
-            .mixtral8x7b_instruct_v0_1()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model = GgufLoader::default()
-            .llama3_1_8b_instruct()
-            .mistral_nemo_instruct2407()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model = GgufLoader::default()
-            .llama3_1_8b_instruct()
-            .phi3_medium4k_instruct()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model = GgufLoader::default()
-            .llama3_1_8b_instruct()
-            .phi3_mini4k_instruct()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
-
-        let model: LocalLlmModel = GgufLoader::default()
-            .phi3_5_mini_instruct()
-            .available_vram(48)
-            .load()
-            .unwrap();
-
-        println!("{:#?}", model);
     }
 }

@@ -29,8 +29,8 @@ impl ApiLlmModel {
         ApiLlmModel {
             model_base: LlmModelBase {
                 model_id,
-                context_length: 127072,
-                max_tokens_output: 8192,
+                model_ctx_size: 127072,
+                inference_ctx_size: 8192,
                 tokenizer,
             },
             cost_per_m_in_tokens: 0.1,
@@ -46,8 +46,8 @@ impl ApiLlmModel {
         ApiLlmModel {
             model_base: LlmModelBase {
                 model_id,
-                context_length: 127072,
-                max_tokens_output: 8192,
+                model_ctx_size: 127072,
+                inference_ctx_size: 8192,
                 tokenizer,
             },
             cost_per_m_in_tokens: 0.5,
@@ -63,8 +63,8 @@ impl ApiLlmModel {
         ApiLlmModel {
             model_base: LlmModelBase {
                 model_id,
-                context_length: 127072,
-                max_tokens_output: 8192,
+                model_ctx_size: 127072,
+                inference_ctx_size: 8192,
                 tokenizer,
             },
             cost_per_m_in_tokens: 2.5,

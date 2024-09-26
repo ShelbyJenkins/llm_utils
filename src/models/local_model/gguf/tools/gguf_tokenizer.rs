@@ -1,5 +1,6 @@
 //! Adapted from: https://github.com/EricLBuehler/mistral.rs/blob/master/feature = "mistral_rs"-core/src/gguf/gguf_tokenizer.rs
-use super::gguf_metadata::GgufMetadata;
+
+use crate::models::local_model::metadata::tokenizer::{GgmlTokenizerMetadata, GgmlTokenizerModel};
 use anyhow::Context;
 use tokenizers::{
     decoders::{
@@ -17,9 +18,9 @@ use tokenizers::{
     Tokenizer,
 };
 
-struct GgufTokenizerProps {
-    model: String,
-    tokens: Vec<String>,
+struct GgufTokenizerProps<'a> {
+    model: GgmlTokenizerModel,
+    tokens: &'a Vec<String>,
     added_tokens: Option<Vec<String>>,
     scores: Option<Vec<f32>>,
     merges: Option<Vec<String>>,
@@ -28,18 +29,17 @@ struct GgufTokenizerProps {
     bos: u32,
 }
 
-impl GgufTokenizerProps {
-    fn new(metadata: &GgufMetadata) -> crate::Result<Self> {
-        let path_prefixes = vec!["tokenizer", "ggml"];
+impl<'a> GgufTokenizerProps<'a> {
+    fn new(ggml: &'a GgmlTokenizerMetadata) -> crate::Result<Self> {
         let props = Self {
-            model: metadata.get_value(&path_prefixes, "model")?,
-            tokens: metadata.get_value(&path_prefixes, "tokens")?,
-            added_tokens: metadata.get_option_value(&path_prefixes, "added_tokens")?,
-            scores: metadata.get_option_value(&path_prefixes, "scores")?,
-            merges: metadata.get_option_value(&path_prefixes, "merges")?,
-            unk: metadata.get_option_value(&path_prefixes, "unknown_token_id")?,
-            eos: metadata.get_value(&path_prefixes, "eos_token_id")?,
-            bos: metadata.get_value(&path_prefixes, "bos_token_id")?,
+            model: ggml.model.clone(),
+            tokens: &ggml.tokens,
+            added_tokens: ggml.added_tokens.clone(),
+            scores: ggml.scores.clone(),
+            merges: ggml.merges.clone(),
+            unk: ggml.unknown_token_id,
+            eos: ggml.eos_token_id,
+            bos: ggml.bos_token_id,
         };
 
         Ok(props)
@@ -47,22 +47,24 @@ impl GgufTokenizerProps {
 }
 
 /// Some quants have gpt2 as the tokenizer model, but the actual tokenizer should be 'llama'
-pub fn convert_gguf_to_hf_tokenizer(gguf_metadata: &GgufMetadata) -> crate::Result<Tokenizer> {
-    let props = GgufTokenizerProps::new(gguf_metadata)?;
-    let tokenizer = match props.model.as_str() {
-        "llama" | "replit" | "gpt2" => unigram_tokenizer(&props)?,
-        other => {
-            anyhow::bail!("Tokenizer model `{other}` not supported.");
+pub fn convert_gguf_to_hf_tokenizer(ggml: &GgmlTokenizerMetadata) -> crate::Result<Tokenizer> {
+    let props = GgufTokenizerProps::new(ggml)?;
+    let tokenizer = match props.model {
+        GgmlTokenizerModel::Llama | GgmlTokenizerModel::Replit | GgmlTokenizerModel::Gpt2 => {
+            unigram_tokenizer(&props)?
+        }
+        _ => {
+            anyhow::bail!("Tokenizer model `{:?}` not supported.", props.model);
         }
     };
 
     println!(
-        "GGUF tokenizer model is `{model}`, num tokens: {}, num added tokens: {}, num merges: {}, num scores: {}",
+        "GGUF tokenizer model is `{:?}`, num tokens: {}, num added tokens: {}, num merges: {}, num scores: {}",
+        props.model,
         tokenizer.get_vocab_size(true),
         props.added_tokens.as_ref().map(|x| x.len()).unwrap_or(0),
         props.merges.as_ref().map(|x| x.len()).unwrap_or(0),
         props.scores.as_ref().map(|x| x.len()).unwrap_or(0),
-        model = props.model,
     );
     Ok(tokenizer)
 }

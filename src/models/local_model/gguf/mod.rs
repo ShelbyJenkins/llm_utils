@@ -1,10 +1,6 @@
 use super::{
-    hf_loader::HuggingFaceLoader,
-    metadata::LocalLlmMetadata,
-    GgufPresetTrait,
-    HfTokenTrait,
-    LlmChatTemplate,
-    LocalLlmModel,
+    hf_loader::HuggingFaceLoader, metadata::LocalLlmMetadata, GgufPresetTrait, HfTokenTrait,
+    LlmChatTemplate, LocalLlmModel,
 };
 use crate::tokenizer::LlmTokenizer;
 use loaders::{hf::GgufHfLoader, local::GgufLocalLoader, preset::GgufPresetLoader};
@@ -15,7 +11,7 @@ pub mod memory;
 pub mod preset;
 pub mod tools;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GgufLoader {
     pub gguf_preset_loader: GgufPresetLoader,
     pub gguf_local_loader: GgufLocalLoader,

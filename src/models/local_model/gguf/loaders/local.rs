@@ -7,7 +7,7 @@ use crate::models::{
     LlmModelBase,
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GgufLocalLoader {
     pub local_quant_file_path: Option<std::path::PathBuf>,
     pub local_config_path: Option<std::path::PathBuf>,

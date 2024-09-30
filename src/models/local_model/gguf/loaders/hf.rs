@@ -3,7 +3,7 @@ use crate::models::{
     LlmModelBase,
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GgufHfLoader {
     pub hf_quant_file_url: Option<String>,
     pub hf_config_repo_id: Option<String>,

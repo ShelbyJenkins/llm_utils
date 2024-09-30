@@ -1,9 +1,6 @@
 use crate::models::local_model::{
     gguf::{
-        load_chat_template,
-        load_tokenizer,
-        memory::estimate_quantization_level,
-        preset::LlmPreset,
+        load_chat_template, load_tokenizer, memory::estimate_quantization_level, preset::LlmPreset,
     },
     hf_loader::HuggingFaceLoader,
     metadata::LocalLlmMetadata,
@@ -11,6 +8,7 @@ use crate::models::local_model::{
 };
 pub(crate) const DEFAULT_PRESET_CONTEXT_LENGTH: u64 = 4096;
 
+#[derive(Clone)]
 pub struct GgufPresetLoader {
     pub llm_preset: LlmPreset,
     pub preset_with_available_vram_gb: Option<u32>,

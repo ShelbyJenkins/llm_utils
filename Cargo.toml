@@ -5,6 +5,7 @@ edition="2021"
 homepage="https://github.com/shelbyJenkins/llm_utils"
 name="llm_utils"
 readme="README.md"
+
 rust-version="1.79"
 version="0.0.9"
 

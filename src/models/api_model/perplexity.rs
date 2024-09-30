@@ -83,14 +83,14 @@ pub fn model_tokenizer(_model_id: &str) -> Arc<LlmTokenizer> {
 }
 
 pub trait PerplexityModelTrait: Sized {
-    fn model(&mut self) -> &mut Option<ApiLlmModel>;
+    fn model(&mut self) -> &mut ApiLlmModel;
 
     /// Set the model using the model_id string.
     fn model_id_str(mut self, model_id: &str) -> Self
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlmModel::perplexity_model_from_model_id(model_id));
+        *self.model() = ApiLlmModel::perplexity_model_from_model_id(model_id);
         self
     }
 
@@ -98,7 +98,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlmModel::sonar_small());
+        *self.model() = ApiLlmModel::sonar_small();
         self
     }
 
@@ -106,7 +106,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlmModel::sonar_large());
+        *self.model() = ApiLlmModel::sonar_large();
         self
     }
 
@@ -114,7 +114,7 @@ pub trait PerplexityModelTrait: Sized {
     where
         Self: Sized,
     {
-        *self.model() = Some(ApiLlmModel::sonar_huge());
+        *self.model() = ApiLlmModel::sonar_huge();
         self
     }
 }

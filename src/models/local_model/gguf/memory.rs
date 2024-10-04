@@ -18,8 +18,6 @@ pub fn estimate_quantization_level(
 
     let available_memory_bytes = vram_bytes - ctx_memory_size_bytes as f64;
 
-    println!("Available memory: {}", available_memory_bytes);
-
     let quantization_types = [
         GgmlDType::Q8_0,
         GgmlDType::Q6K,
@@ -47,7 +45,6 @@ pub fn estimate_quantization_level(
 
 pub(crate) fn estimate_model_size(params: f64, dtype: GgmlDType) -> f64 {
     let size = params * dtype.bits_per_weight() / 8.0;
-    println!("estimate_model_size: {}", size);
     size
 }
 

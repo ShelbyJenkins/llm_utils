@@ -73,6 +73,13 @@ impl GgufPresetLoader {
             DEFAULT_PRESET_CONTEXT_LENGTH
         };
 
+        if self.preset_with_available_vram_gb.is_none()
+            && self.preset_with_available_vram_bytes.is_none()
+            && self.preset_with_quantization_level.is_none()
+        {
+            self.preset_with_quantization_level = Some(8);
+        };
+
         let file_name: String = if let Some(q_bits) = self.preset_with_quantization_level {
             if let Some(file_name) = self.llm_preset.f_name_for_q_bits(q_bits) {
                 file_name
@@ -84,11 +91,6 @@ impl GgufPresetLoader {
             }
         } else {
             let ctx_memory_size_bytes = config_json.estimate_context_size(ctx_size as u64);
-            if self.preset_with_available_vram_gb.is_none()
-                && self.preset_with_available_vram_bytes.is_none()
-            {
-                crate::bail!("To select quantization level, either preset_with_available_vram_gb or preset_with_available_vram_bytes must be set");
-            }
 
             let initial_q_bits = estimate_quantization_level(
                 self.llm_preset.number_of_parameters(),
@@ -122,37 +124,37 @@ mod tests {
 
     #[test]
     fn load_from_vram() {
-        let model = GgufLoader::default()
-            .mistral_small_instruct2409()
+        // let model = GgufLoader::default()
+        //     .mistral_small_instruct2409()
+        //     .preset_with_available_vram_gb(48)
+        //     .load()
+        //     .unwrap();
+
+        // println!("{:#?}", model);
+
+        let model: LocalLlmModel = GgufLoader::default()
+            .llama3_1_8b_instruct()
             .preset_with_available_vram_gb(48)
             .load()
             .unwrap();
 
         println!("{:#?}", model);
 
-        // let model: LocalLlmModel = GgufLoader::default()
-        //     .llama3_1_8b_instruct()
-        //     .preset_with_available_vram_gb(48)
-        //     .load()
-        //     .unwrap();
+        let model = GgufLoader::default()
+            .phi3_5_mini_instruct()
+            .preset_with_available_vram_gb(48)
+            .load()
+            .unwrap();
 
-        // println!("{:#?}", model);
+        println!("{:#?}", model);
 
-        // let model = GgufLoader::default()
-        //     .phi3_5_mini_instruct()
-        //     .preset_with_available_vram_gb(48)
-        //     .load()
-        //     .unwrap();
+        let model = GgufLoader::default()
+            .mistral_nemo_instruct2407()
+            .preset_with_available_vram_gb(48)
+            .load()
+            .unwrap();
 
-        // println!("{:#?}", model);
-
-        // let model = GgufLoader::default()
-        //     .mistral_nemo_instruct2407()
-        //     .preset_with_available_vram_gb(48)
-        //     .load()
-        //     .unwrap();
-
-        // println!("{:#?}", model);
+        println!("{:#?}", model);
     }
 
     #[test]

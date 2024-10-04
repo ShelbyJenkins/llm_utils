@@ -1,6 +1,6 @@
 //! Downloads to Path: "/root/.cache/huggingface/hub/
 use anyhow::{anyhow, Result};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use hf_hub::api::sync::{Api, ApiBuilder};
 use std::{cell::OnceCell, path::PathBuf};
 
@@ -43,15 +43,11 @@ impl HuggingFaceLoader {
             println!("Using hf_token from parameter");
             return Some(hf_token.to_owned());
         }
-        println!("hf_token not set. Attempting to load from .env");
+
         dotenv().ok();
 
-        match dotenv::var(&self.hf_token_env_var) {
-            Ok(hf_token) => {
-                println!("Successfully loaded hf_token from .env");
-
-                Some(hf_token)
-            }
+        match dotenvy::var(&self.hf_token_env_var) {
+            Ok(hf_token) => Some(hf_token),
             Err(_) => {
                 println!(
                     "{} not found in dotenv, nor was it set manually",

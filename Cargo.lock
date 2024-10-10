@@ -168,6 +168,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "colorful"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffb474a9c3219a8254ead020421ecf1b90427f29b55f6aae9a2471fa62c126ef"
+
+[[package]]
 name = "console"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -694,6 +700,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indenter"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
+
+[[package]]
 name = "indexmap"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -811,17 +823,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
-name = "llm_utils"
-version = "0.0.10"
+name = "llm_models"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "byteorder",
+ "colorful",
  "dotenvy",
  "hf-hub",
- "html2text",
- "linkify",
+ "indenter",
+ "llm_prompt",
  "minijinja",
  "paste",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tiktoken-rs",
+ "tokenizers",
+]
+
+[[package]]
+name = "llm_prompt"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "colorful",
+ "indenter",
+ "minijinja",
+ "thiserror",
+]
+
+[[package]]
+name = "llm_utils"
+version = "0.0.11"
+dependencies = [
+ "anyhow",
+ "html2text",
+ "linkify",
+ "llm_models",
  "rayon",
  "readability",
  "regex",
@@ -830,7 +869,6 @@ dependencies = [
  "text-splitter",
  "thiserror",
  "tiktoken-rs",
- "tokenizers",
  "unicode-properties",
  "unicode-segmentation",
  "url",

@@ -1,6 +1,6 @@
-# llm_utils: Tools for LLMs with minimal abstraction.
+# llm_utils: The best possible text chunker and text splitter and other text tools
 
-`llm_utils` is not a 'framework'. There are no chains, agents, or buzzwords. Abstraction is minimized as much as possible and individual components are easily accessible. For real world examples of how this crate is used, check out the [llm_client crate](https://github.com/ShelbyJenkins/llm_client).
+Note: Many of the tools that were previously in this crate have been split into sub-crates of the [llm_client](https://github.com/ShelbyJenkins/llm_client) project.
 
 
 ##### Cargo Install
@@ -9,124 +9,6 @@
 llm_utils="*"
 ```
 
-
-### LocalLlmModel
-
-Everything you need for GGUF models. The `GgugLoader` wraps the loaders for convience. All loaders return a `LocalLlmModel` which contains the tokenizer, metadata, chat template, and anything that can be extract from the GGUF. 
-
-
-#### GgufPresetLoader
-
-* Presets for popular models like Llama 3, Phi, Mistral/Mixtral, and more
-* Loads the best quantized model by calculating the largest quant that will fit in your VRAM
-
-```rust
-let model: LocalLlmModel = GgufLoader::default()
-    .llama3_1_8b_instruct()
-    .preset_with_available_vram_gb(48) // Load the largest quant that will fit in your vram
-    .load()?;
-```
-
-#### GgufHfLoader
-
-GGUF models from Hugging Face.
-
-```rust
-let model: LocalLlmModel = GgufLoader::default()
-    .hf_quant_file_url("https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/blob/main/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf")
-    .load()?;
-```
-
-#### GgufLocalLoader
-
-GGUF models for local storage.
-
-```rust
-let model: LocalLlmModel = GgufLoader::default()
-    .local_quant_file_path("/root/.cache/huggingface/hub/models--bartowski--Meta-Llama-3.1-8B-Instruct-GGUF/blobs/9da71c45c90a821809821244d4971e5e5dfad7eb091f0b8ff0546392393b6283")
-    .load()?;
-```
-
-#### ApiLlmModel
-
-* Supports openai, anthropic, perplexity, and adding your own API models
-* Supports prompting, tokenization, and price estimation
-
-```rust
-    assert_eq!(ApiLlmModel::gpt_4_o(), ApiLlmModel {
-        model_id: "gpt-4o".to_string(),
-        context_length: 128000,
-        cost_per_m_in_tokens: 5.00,
-        max_tokens_output: 4096,
-        cost_per_m_out_tokens: 15.00,
-        tokens_per_message: 3,
-        tokens_per_name: 1,
-        tokenizer: Arc<LlmTokenizer>,
-    })
-```
-
-### LlmTokenizer
-
-* Simple abstract API for encoding and decoding allows for abstract LLM consumption across multiple architechtures.
-*Hugging Face's Tokenizer library for local models and Tiktoken-rs for OpenAI and Anthropic ([Anthropic doesn't have a publically available tokenizer](https://github.com/javirandor/anthropic-tokenizer).)
-
-```rust
-    let tok = LlmTokenizer::new_tiktoken("gpt-4o"); // Get a Tiktoken tokenizer
-    let tok = LlmTokenizer::new_from_tokenizer_json("path/to/tokenizer.json"); // From local path
-    let tok = LlmTokenizer::new_from_hf_repo(hf_token, "meta-llama/Meta-Llama-3-8B-Instruct"); // From repo
-    // From LocalLlmModel or ApiLlmModel
-    let tok = model.model_base.tokenizer;
-```
-
-### LlmPrompt
-
-* Generate properly formatted prompts for GGUF models, Openai, and Anthropic. Supports chat template strings/tokens and openai hashmaps
-* Count prompt tokens and check to ensure it's within model limits
-* Uses the GGUF's chat template and Jinja templates to format the prompt to model spec. Build with generation prefixes on all chat template models. Even those that don't explicitly support it.
-
-```rust
-// From LocalLlmModel or ApiLlmModel
-let prompt: LlmPrompt = LlmPrompt::new_chat_template_prompt(&model);
-let prompt: LlmPrompt = LlmPrompt::new_openai_prompt(&model);
-
-// Add system messages
-prompt.add_system_message().set_content("You are a nice robot");
-
-// User messages
-prompt.add_user_message().set_content("Hello");
-
-// LLM responses
-prompt.add_assistant_message().set_content("Well how do you do?");
-
-// Messages all share the same functions see prompting::PromptMessage for more
-prompt.add_system_message().append_content(final_rule_set);
-prompt.add_system_message().prepend_content(starting_rule_set);
-
-// Builds with generation prefix. The llm will complete the response: 'Don't you think that is... cool?'. 
-prompt.set_generation_prefix("Don't you think that is...");
-
-// Get total tokens in prompt
-let total_prompt_tokens: u32 = prompt.get_total_prompt_tokens();
-
-// Get chat template formatted prompt
-let chat_template_prompt: String = prompt.get_built_prompt_string();
-let chat_template_prompt_as_tokens: Vec<u32> = prompt.get_built_prompt_as_tokens()
-
-// Openai formatted prompt (Openai and Anthropic format)
-let openai_prompt: Vec<HashMap<String, String>> = prompt.get_built_prompt_hashmap()
-
-
-// Validate requested max_tokens for a generation. If it exceeds the models limits, reduce max_tokens to a safe value.
-let actual_request_tokens = check_and_get_max_tokens(
-        model.context_length,
-        model.max_tokens_output, // If using a GGUF model use either model.context_length or the ctx_size of the server.
-        total_prompt_tokens,
-        10,
-        requested_max_tokens,
-    )?;
-```
-
-### Text Processing and NLP 
 
 ### TextChunker
 
@@ -237,39 +119,6 @@ let cleaned_text: String = llm_utils::text_utils::clean_html::clean_html(raw_htm
 * Macro generated test content
 * Used for internal testing, but can be used for general LLM test cases
 
-### Grammar Constraints
-
-* Pre-built configurable grammars for fine grained control of open source LLM outputs. Current implementations include booleans, integers, sentences, words, exact strings, and more. Open an issue if you'd like to suggest more
-* [Grammars are the most capable method for structuring the output of an LLM.](https://github.com/ggerganov/llama.cpp/blob/master/grammars/README.md) This was designed for use with LlamaCpp, but plan to support others
-
-```rust
-// A grammar that constraints to a number between 1 and 4
-let integer_grammar: IntegerGrammar = Grammar::integer();
-integer_grammar.lower_bound(1).upper_bound(4);
-// Sets a stop word to be appended to the end of generation
-integer_grammar.set_stop_word_done("Done.");
-// Sets the primitive as optional; a stop word can be generated rather than the primitive
-integer_grammar.set_stop_word_no_result("None.");
-
-// Returns the string to feed into LLM call
-let grammar_string: String = integer_grammar.grammar_string();
-
-// Cleans the response and checks if it's valid
-let string_response: Result<String, GrammarError> = integer_grammar.validate_clean(llm_response);
-// Parses the response to the grammar's primitive
-let integer_response: Result<u32, GrammarError>  = integer_grammar.grammar_parse(llm_response);
-
-// Enum for dynamic abstraction
-let grammar: Grammar = integer_grammar.wrap();
-// The enum implements the same functions that are generic across all grammars
-grammar.set_stop_word_done("Done.");
-let grammar_string: String = grammar.grammar_string();
-let string_response: Result<String, GrammarError> = grammar.validate_clean(llm_response);
-```
-
-### Setter Traits
-* All setter traits are public, so you can integrate into your own projects if you wish. 
-* For example: `OpenAiModelTrait`,`GgufLoaderTrait`,`AnthropicModelTrait`, and `HfTokenTrait` for loading models 
 
 ## Blog Posts
 
